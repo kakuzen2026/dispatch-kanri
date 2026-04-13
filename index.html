@@ -140,6 +140,111 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .login-logo .licon{font-size:40px;margin-bottom:12px;}
 .login-logo h1{font-size:18px;font-weight:700;color:var(--accent2);}
 .login-logo p{font-size:12px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:4px;}
+
+/* ===== MOBILE BOTTOM NAV ===== */
+#mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg2);border-top:1px solid var(--border);z-index:100;padding:6px 0 env(safe-area-inset-bottom,6px);}
+.mnav-inner{display:flex;justify-content:space-around;align-items:center;}
+.mnav-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 8px;cursor:pointer;color:var(--text3);min-width:48px;transition:color .15s;-webkit-tap-highlight-color:transparent;}
+.mnav-item.active{color:var(--accent2);}
+.mnav-item .micon{font-size:20px;line-height:1;}
+.mnav-item .mlabel{font-size:10px;white-space:nowrap;}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:768px){
+  #sidebar{display:none;}
+  #main{margin-left:0;}
+  #mobile-nav{display:block;}
+  .content{padding:14px 12px 90px;}
+  .topbar{padding:0 12px;height:52px;}
+  .topbar-title{font-size:14px;font-weight:600;}
+
+  /* topbar アクションボタン：テキスト非表示・アイコンのみ */
+  .topbar-actions .btn{padding:7px 12px;font-size:12px;}
+  .topbar-actions .btn-text{display:none;}
+
+  /* stats 2列 */
+  .stat-grid{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+  .stat-card{padding:14px;}
+  .stat-value{font-size:22px;}
+  .stat-label{font-size:10px;}
+
+  /* table → カード形式 */
+  table{display:block;}
+  thead{display:none;}
+  tbody{display:block;}
+  tr{display:block;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px;}
+  tr:hover td{background:transparent;}
+  td{display:flex;align-items:flex-start;gap:8px;border:none;padding:3px 0;font-size:13px;line-height:1.5;}
+  td::before{content:attr(data-label);font-size:10px;color:var(--text3);min-width:72px;padding-top:3px;flex-shrink:0;letter-spacing:.03em;}
+  td[data-label=""]::before,td.no-label::before{display:none;}
+  td:last-child{padding-top:10px;border-top:1px solid var(--border);margin-top:6px;flex-wrap:wrap;gap:6px;}
+  td:last-child::before{display:none;}
+  /* ボタン類を全幅に */
+  td:last-child .btn{flex:1;min-width:60px;justify-content:center;}
+
+  /* form グリッド解除 */
+  .form-row,.form-row-3{grid-template-columns:1fr;}
+
+  /* モーダル → 下からスライド */
+  .modal{
+    border-radius:20px 20px 0 0;
+    position:fixed;bottom:0;left:0;right:0;
+    width:100% !important;max-width:100% !important;
+    max-height:94vh;margin:0;
+    animation:slideUp .2s ease;
+  }
+  @keyframes slideUp{from{transform:translateY(30px);opacity:.8}to{transform:none;opacity:1}}
+  .modal-overlay{align-items:flex-end;}
+  .modal-body{padding:16px;-webkit-overflow-scrolling:touch;}
+  .modal-header{padding:16px 16px 14px;}
+  .modal-header h2{font-size:14px;}
+  .modal-footer{
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));
+    gap:8px;flex-wrap:wrap;
+  }
+  .modal-footer .btn{flex:1;justify-content:center;font-size:13px;padding:10px 8px;min-width:80px;}
+
+  /* モーダルドラッグハンドル */
+  .modal::before{
+    content:'';display:block;width:36px;height:4px;
+    background:var(--border);border-radius:2px;
+    margin:10px auto 0;
+  }
+
+  /* search box */
+  .search-box{max-width:100%;}
+  .section-header{flex-direction:column;align-items:stretch;gap:10px;}
+  .section-header .btn{width:100%;justify-content:center;}
+
+  /* tabs スクロール */
+  .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:1px;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{white-space:nowrap;padding:8px 12px;font-size:12px;}
+
+  /* toast 位置（ボトムナビの上） */
+  #toast-container{bottom:80px;right:10px;left:10px;}
+  .toast{min-width:unset;width:100%;font-size:12px;}
+
+  /* カード・その他 */
+  .card{padding:14px;}
+  .emp-card-grid{grid-template-columns:1fr;}
+  .ct-header{grid-template-columns:1fr;}
+  .wp-row{grid-template-columns:1fr 1fr;gap:6px;}
+  .wp-row>div:nth-child(1){grid-column:1/-1;}
+  .wp-row input{font-size:13px;padding:8px;}
+  .doc-btn-grid{grid-template-columns:1fr;}
+  .doc-btn{padding:10px 12px;}
+  .login-card{width:94vw;padding:28px 20px;border-radius:20px;}
+  .form-section{padding:12px;}
+  .sel-emp-item{flex-direction:column;align-items:flex-start;gap:6px;}
+  .sel-emp-item>div{width:100%;justify-content:space-between;}
+  .emp-option{padding:11px 12px;}
+
+  /* フォーム入力タップしやすく */
+  .form-input,.form-select,.form-textarea{font-size:16px;padding:10px 12px;}
+  .form-textarea{min-height:80px;}
+  .btn-sm{padding:7px 12px;font-size:12px;}
+}
 </style>
 </head>
 <body>
@@ -172,6 +277,18 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <div class="nav-item" onclick="navigate('settings')"><span class="icon">⚙️</span>設定</div>
   </div>
   <div class="sidebar-bottom"><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">v3.0.0</div></div>
+</nav>
+
+<!-- MOBILE BOTTOM NAV -->
+<nav id="mobile-nav">
+  <div class="mnav-inner">
+    <div class="mnav-item active" onclick="navigate('dashboard')" data-page="dashboard"><div class="micon">📊</div><div class="mlabel">ホーム</div></div>
+    <div class="mnav-item" onclick="navigate('clients')" data-page="clients"><div class="micon">🏢</div><div class="mlabel">取引先</div></div>
+    <div class="mnav-item" onclick="navigate('sites')" data-page="sites"><div class="micon">📍</div><div class="mlabel">現場</div></div>
+    <div class="mnav-item" onclick="navigate('contracts')" data-page="contracts"><div class="micon">📄</div><div class="mlabel">契約</div></div>
+    <div class="mnav-item" onclick="navigate('billing')" data-page="billing"><div class="micon">💴</div><div class="mlabel">請求</div></div>
+    <div class="mnav-item" onclick="navigate('settings')" data-page="settings"><div class="micon">⚙️</div><div class="mlabel">設定</div></div>
+  </div>
 </nav>
 
 <!-- MAIN -->
@@ -545,18 +662,20 @@ function showApp(){loadDashboard();}
 // ===== NAV =====
 const NAV_TITLES={dashboard:'ダッシュボード',clients:'取引先管理',sites:'現場管理',contracts:'契約管理',billing:'請求管理',settings:'設定'};
 const NAV_BTNS={
-  clients:`<button class="btn btn-primary" onclick="openClientModal()">＋ 取引先を登録</button>`,
-  sites:`<button class="btn btn-primary" onclick="openSiteModal()">＋ 現場を登録</button>`,
-  contracts:`<button class="btn btn-primary" onclick="openContractModal()">＋ 契約を作成</button>`,
-  billing:`<button class="btn btn-primary" onclick="openBillingModal()">＋ 請求を記録</button>`,
+  clients:`<button class="btn btn-primary" onclick="openClientModal()">＋ <span class="btn-text">取引先を登録</span></button>`,
+  sites:`<button class="btn btn-primary" onclick="openSiteModal()">＋ <span class="btn-text">現場を登録</span></button>`,
+  contracts:`<button class="btn btn-primary" onclick="openContractModal()">＋ <span class="btn-text">契約を作成</span></button>`,
+  billing:`<button class="btn btn-primary" onclick="openBillingModal()">＋ <span class="btn-text">請求を記録</span></button>`,
 };
 function navigate(page){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.mnav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+page).classList.add('active');
   document.getElementById('page-title').textContent=NAV_TITLES[page]||page;
   document.getElementById('topbar-actions').innerHTML=NAV_BTNS[page]||'';
   document.querySelectorAll('.nav-item').forEach(n=>{if(n.textContent.includes(NAV_TITLES[page]))n.classList.add('active');});
+  document.querySelectorAll('.mnav-item').forEach(n=>{if(n.dataset.page===page)n.classList.add('active');});
   ST.page=page;
   if(page==='dashboard') loadDashboard();
   else if(page==='clients') loadClients();
@@ -588,8 +707,13 @@ async function loadDashboard(){
     const sm={};(sites||[]).forEach(s=>sm[s.id]=s);
     exEl.innerHTML=`<table><thead><tr><th>現場</th><th>取引先</th><th>終了日</th><th>残日数</th><th>操作</th></tr></thead><tbody>
       ${expiring.map(x=>{const si=sm[x.site_id];const d=Math.ceil((new Date(x.contract_end)-today)/86400000);const cls=d<=14?'expiry-expired':'expiry-near';
-        return`<tr><td>${si?.name||'—'}</td><td>${si?.clients?.name||'—'}</td><td class="${cls}">${x.contract_end}</td><td class="${cls}">${d}日</td>
-        <td><button class="btn btn-warning btn-sm" onclick="openRenewalModal('${x.id}')">🔄 更新</button></td></tr>`;
+        return`<tr>
+          <td data-label="現場">${si?.name||'—'}</td>
+          <td data-label="取引先">${si?.clients?.name||'—'}</td>
+          <td data-label="終了日" class="${cls}">${x.contract_end}</td>
+          <td data-label="残日数" class="${cls}">${d}日</td>
+          <td class="no-label"><button class="btn btn-warning btn-sm" onclick="openRenewalModal('${x.id}')">🔄 更新</button></td>
+        </tr>`;
       }).join('')}</tbody></table>`;
   }
   const {data:recent}=await db.from('contracts').select('*,sites(name,clients(name)),contract_employees(id,is_active)').order('created_at',{ascending:false}).limit(6);
@@ -598,10 +722,14 @@ async function loadDashboard(){
   else{
     rcEl.innerHTML=`<table><thead><tr><th>契約番号</th><th>現場</th><th>取引先</th><th>期間</th><th>スタッフ</th><th>状態</th></tr></thead><tbody>
       ${recent.map(x=>{const cnt=(x.contract_employees||[]).filter(e=>e.is_active).length;
-        return`<tr><td style="font-family:'DM Mono',monospace;font-size:12px;">${x.contract_no||'—'}</td>
-        <td><strong>${x.sites?.name||'—'}</strong></td><td>${x.sites?.clients?.name||'—'}</td>
-        <td style="font-family:'DM Mono',monospace;font-size:12px;">${x.contract_start}〜${x.contract_end}</td>
-        <td><span class="badge badge-blue">${cnt}名</span></td><td>${stBadge(x.status,x.contract_end)}</td></tr>`;
+        return`<tr>
+          <td data-label="契約番号" style="font-family:'DM Mono',monospace;font-size:12px;">${x.contract_no||'—'}</td>
+          <td data-label="現場"><strong>${x.sites?.name||'—'}</strong></td>
+          <td data-label="取引先">${x.sites?.clients?.name||'—'}</td>
+          <td data-label="期間" style="font-family:'DM Mono',monospace;font-size:12px;">${x.contract_start}〜${x.contract_end}</td>
+          <td data-label="人数"><span class="badge badge-blue">${cnt}名</span></td>
+          <td data-label="状態">${stBadge(x.status,x.contract_end)}</td>
+        </tr>`;
       }).join('')}</tbody></table>`;
   }
 }
@@ -633,9 +761,15 @@ function renderClients(list){
   const el=document.getElementById('clients-table');
   if(!list.length){el.innerHTML='<div class="empty-state"><div class="icon">🏢</div><p>取引先が登録されていません</p></div>';return;}
   el.innerHTML=`<table><thead><tr><th>企業名</th><th>担当者</th><th>電話番号</th><th>メール</th><th>操作</th></tr></thead><tbody>
-    ${list.map(c=>`<tr><td><strong>${c.name}</strong></td><td>${c.contact_person||'—'}</td><td>${c.contact_phone||'—'}</td><td>${c.contact_email||'—'}</td>
-    <td style="display:flex;gap:6px;"><button class="btn btn-secondary btn-sm" onclick='openClientModal(${JSON.stringify(c)})'>編集</button>
-    <button class="btn btn-danger btn-sm" onclick="deleteClient('${c.id}')">削除</button></td></tr>`).join('')}</tbody></table>`;
+    ${list.map(c=>`<tr>
+      <td data-label="企業名"><strong>${c.name}</strong></td>
+      <td data-label="担当者">${c.contact_person||'—'}</td>
+      <td data-label="電話番号">${c.contact_phone||'—'}</td>
+      <td data-label="メール">${c.contact_email||'—'}</td>
+      <td class="no-label" style="display:flex;gap:6px;">
+        <button class="btn btn-secondary btn-sm" onclick='openClientModal(${JSON.stringify(c)})'>編集</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteClient('${c.id}')">削除</button>
+      </td></tr>`).join('')}</tbody></table>`;
 }
 function filterClients(){const q=document.getElementById('search-clients').value.toLowerCase();renderClients(ST.clients.filter(c=>c.name.toLowerCase().includes(q)));}
 function openClientModal(c){
@@ -673,9 +807,16 @@ function renderSites(list){
     ${list.map(s=>{
       const ps=s.work_patterns||[];
       const ph=ps.length?ps.map(p=>`<div style="font-size:11px;">${p.pattern_name}：${p.start_time?.substring(0,5)}〜${p.end_time?.substring(0,5)}（休憩${p.break_minutes}分）</div>`).join(''):'<span style="color:var(--text3);font-size:11px;">未設定</span>';
-      return`<tr><td><strong>${s.name}</strong></td><td>${s.clients?.name||'—'}</td><td>${s.job_type||'—'}</td><td>${s.supervisor||'—'}</td><td>${ph}</td>
-      <td style="display:flex;gap:6px;"><button class="btn btn-secondary btn-sm" onclick='openSiteModal(${JSON.stringify(s)})'>編集</button>
-      <button class="btn btn-danger btn-sm" onclick="deleteSite('${s.id}')">削除</button></td></tr>`;
+      return`<tr>
+        <td data-label="現場名"><strong>${s.name}</strong></td>
+        <td data-label="取引先">${s.clients?.name||'—'}</td>
+        <td data-label="職種">${s.job_type||'—'}</td>
+        <td data-label="指揮命令者">${s.supervisor||'—'}</td>
+        <td data-label="就業時間">${ph}</td>
+        <td class="no-label" style="display:flex;gap:6px;">
+          <button class="btn btn-secondary btn-sm" onclick='openSiteModal(${JSON.stringify(s)})'>編集</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSite('${s.id}')">削除</button>
+        </td></tr>`;
     }).join('')}</tbody></table>`;
 }
 function filterSites(){const q=document.getElementById('search-sites').value.toLowerCase();renderSites(ST.sites.filter(s=>s.name.toLowerCase().includes(q)||(s.clients?.name||'').toLowerCase().includes(q)));}
@@ -789,16 +930,20 @@ function renderContracts(){
   el.innerHTML=`<table><thead><tr><th>契約番号</th><th>現場</th><th>取引先</th><th>期間</th><th>人数</th><th>状態</th><th>操作</th></tr></thead><tbody>
     ${list.map(x=>{
       const cnt=(x.contract_employees||[]).filter(e=>e.is_active).length;
-      return`<tr><td style="font-family:'DM Mono',monospace;font-size:12px;">${x.contract_no||'—'}</td>
-        <td><strong>${x.sites?.name||'—'}</strong></td><td>${x.sites?.clients?.name||'—'}</td>
-        <td style="font-family:'DM Mono',monospace;font-size:12px;">${x.contract_start}〜${x.contract_end}</td>
-        <td><span class="badge badge-blue">${cnt}名</span></td><td>${stBadge(x.status,x.contract_end)}</td>
-        <td style="display:flex;gap:4px;flex-wrap:wrap;">
+      return`<tr>
+        <td data-label="契約番号" style="font-family:'DM Mono',monospace;font-size:12px;">${x.contract_no||'—'}</td>
+        <td data-label="現場"><strong>${x.sites?.name||'—'}</strong></td>
+        <td data-label="取引先">${x.sites?.clients?.name||'—'}</td>
+        <td data-label="期間" style="font-family:'DM Mono',monospace;font-size:12px;">${x.contract_start}〜${x.contract_end}</td>
+        <td data-label="人数"><span class="badge badge-blue">${cnt}名</span></td>
+        <td data-label="状態">${stBadge(x.status,x.contract_end)}</td>
+        <td class="no-label" style="display:flex;gap:4px;flex-wrap:wrap;">
           <button class="btn btn-secondary btn-sm" onclick="openCtDetail('${x.id}')">詳細</button>
           <button class="btn btn-secondary btn-sm" onclick="openContractModal('${x.id}')">編集</button>
           <button class="btn btn-purple btn-sm" onclick="openDocsModal('${x.id}')">📄 書類</button>
           ${x.status==='active'?`<button class="btn btn-warning btn-sm" onclick="openRenewalModal('${x.id}')">🔄 更新</button>`:''}
           ${x.status==='active'?`<button class="btn btn-danger btn-sm" onclick="endContract('${x.id}')">終了</button>`:''}
+          <button class="btn btn-danger btn-sm" onclick="deleteContract('${x.id}')">削除</button>
         </td></tr>`;
     }).join('')}</tbody></table>`;
 }
@@ -835,7 +980,8 @@ async function openCtDetail(cid){
     <button class="btn btn-secondary" onclick="closeModal('modal-ct-detail');openContractModal('${c.id}')">✏️ 編集</button>
     <button class="btn btn-purple" onclick="closeModal('modal-ct-detail');openDocsModal('${c.id}')">📄 書類を生成</button>
     ${c.status==='active'?`<button class="btn btn-warning" onclick="closeModal('modal-ct-detail');openRenewalModal('${c.id}')">🔄 契約を更新</button>`:''}
-    ${c.status==='active'?`<button class="btn btn-danger" onclick="closeModal('modal-ct-detail');endContract('${c.id}')">契約を終了</button>`:''}`;
+    ${c.status==='active'?`<button class="btn btn-danger" onclick="closeModal('modal-ct-detail');endContract('${c.id}')">契約を終了</button>`:''}
+    <button class="btn btn-danger" onclick="closeModal('modal-ct-detail');deleteContract('${c.id}')">🗑 削除</button>`;
   openModal('modal-ct-detail');
 }
 
@@ -846,6 +992,14 @@ async function endContract(id){
   toast('契約を終了しました','success');loadContracts();
 }
 
+async function deleteContract(id){
+  if(!confirm('この契約を完全に削除しますか？\nスタッフの紐づけも全て削除されます。\nこの操作は元に戻せません。'))return;
+  await db.from('contract_employees').delete().eq('contract_id',id);
+  const {error}=await db.from('contracts').delete().eq('id',id);
+  if(error){toast('削除に失敗しました','error');return;}
+  toast('契約を削除しました','success');loadContracts();
+}
+
 // ===== EMPLOYEE SEARCH =====
 async function searchCEmp(q){
   const dd=document.getElementById('ct-emp-dd');
@@ -853,32 +1007,45 @@ async function searchCEmp(q){
   empTimer=setTimeout(async()=>{
     dd.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--text3);">読み込み中...</div>';
     dd.style.display='block';
-    if(!empCache){const {data}=await empDb.from('employees').select('id,sei,mei,seikana,meikana').order('sei').limit(200);empCache=data||[];}
+    if(!empCache){const {data}=await empDb.from('employees').select('id,sei,mei,seikana,meikana,employment_type').order('sei').limit(200);empCache=data||[];}
     const used=selEmps.map(e=>e.id);
     const filtered=(!q?empCache:empCache.filter(e=>(e.sei||'').toLowerCase().includes(q.toLowerCase())||(e.mei||'').toLowerCase().includes(q.toLowerCase())||(e.seikana||'').includes(q)||(e.meikana||'').includes(q))).filter(e=>!used.includes(e.id));
     if(!filtered.length){dd.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--text3);">該当なし</div>';return;}
-    dd.innerHTML=filtered.map(e=>{const name=`${e.sei} ${e.mei}`;const kana=`${e.seikana||''} ${e.meikana||''}`.trim();
-      return`<div class="emp-option" onclick="addSelEmp(${e.id},'${name.replace(/'/g,"\\'")}')">
+    dd.innerHTML=filtered.map(e=>{
+      const name=`${e.sei} ${e.mei}`;const kana=`${e.seikana||''} ${e.meikana||''}`.trim();
+      const etLabel=e.employment_type==='permanent'?'無期':'有期';
+      const etColor=e.employment_type==='permanent'?'var(--success)':'var(--accent2)';
+      return`<div class="emp-option" onclick="addSelEmp(${e.id},'${name.replace(/'/g,"\\'")}','${e.employment_type||'fixed'}')">
         <div><div style="font-weight:500;">${name}</div>${kana?`<div style="font-size:11px;color:var(--text3);">${kana}</div>`:''}</div>
-        <span class="emp-id-label">ID:${e.id}</span></div>`;}).join('');
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:11px;color:${etColor};font-weight:600;">${etLabel}</span>
+          <span class="emp-id-label">ID:${e.id}</span>
+        </div></div>`;}).join('');
   },q?150:0);
 }
-function addSelEmp(id,name){if(selEmps.find(e=>e.id===id))return;selEmps.push({id,name,employment_type:'fixed'});renderSelEmps();document.getElementById('ct-emp-dd').style.display='none';document.getElementById('ct-emp-search').value='';}
+function addSelEmp(id,name,empType){
+  if(selEmps.find(e=>e.id===id))return;
+  selEmps.push({id,name,employment_type:empType||'fixed'});
+  renderSelEmps();
+  document.getElementById('ct-emp-dd').style.display='none';
+  document.getElementById('ct-emp-search').value='';
+}
 function removeSelEmp(id){selEmps=selEmps.filter(e=>e.id!==id);renderSelEmps();}
 function renderSelEmps(){
   const el=document.getElementById('sel-emp-list');
   if(!selEmps.length){el.innerHTML='';return;}
-  el.innerHTML=selEmps.map(e=>`
-    <div class="sel-emp-item">
+  el.innerHTML=selEmps.map(e=>{
+    const etLabel=e.employment_type==='permanent'?'無期契約':'有期契約';
+    const etColor=e.employment_type==='permanent'?'var(--success)':'var(--accent2)';
+    return`<div class="sel-emp-item">
       <span class="sname">👤 ${e.name}</span>
       <div style="display:flex;align-items:center;gap:8px;">
-        <select onchange="selEmps.find(x=>x.id===${e.id}).employment_type=this.value">
-          <option value="fixed" ${e.employment_type==='fixed'?'selected':''}>有期契約</option>
-          <option value="permanent" ${e.employment_type==='permanent'?'selected':''}>無期契約</option>
-        </select>
+        <span style="font-size:12px;font-weight:600;color:${etColor};">${etLabel}</span>
+        <span style="font-size:11px;color:var(--text3);">（従業員台帳から取得）</span>
         <button class="rm-btn" onclick="removeSelEmp(${e.id})">✕</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 async function openContractModal(cid){
@@ -910,15 +1077,17 @@ async function openContractModal(cid){
   // スタッフ選択：編集時は既存スタッフを復元
   selEmps=[];empCache=null;
   if(existing?.contract_employees?.length){
-    // 従業員台帳から名前を取得
     const empIds=existing.contract_employees.map(e=>e.employee_id);
-    const {data:emps}=await empDb.from('employees').select('id,sei,mei').in('id',empIds);
-    const nameMap={};(emps||[]).forEach(e=>nameMap[e.id]=`${e.sei} ${e.mei}`);
-    selEmps=existing.contract_employees.map(e=>({
-      id:e.employee_id,
-      name:nameMap[e.employee_id]||`ID:${e.employee_id}`,
-      employment_type:e.employment_type||'fixed',
-    }));
+    const {data:emps}=await empDb.from('employees').select('id,sei,mei,employment_type').in('id',empIds);
+    const empMap={};(emps||[]).forEach(e=>empMap[e.id]=e);
+    selEmps=existing.contract_employees.map(e=>{
+      const emp=empMap[e.employee_id];
+      return{
+        id:e.employee_id,
+        name:emp?`${emp.sei} ${emp.mei}`:`ID:${e.employee_id}`,
+        employment_type:emp?.employment_type||e.employment_type||'fixed',
+      };
+    });
   }
   renderSelEmps();
   document.getElementById('ct-emp-dd').style.display='none';
@@ -1393,12 +1562,16 @@ async function loadBilling(){
   if(!ST.billing.length){el.innerHTML='<div class="empty-state"><div class="icon">💴</div><p>この月の請求がありません</p></div>';return;}
   const total=ST.billing.reduce((s,b)=>s+(b.amount||0),0);
   el.innerHTML=`<table><thead><tr><th>取引先</th><th>対象月</th><th>金額</th><th>状態</th><th>備考</th><th>操作</th></tr></thead><tbody>
-    ${ST.billing.map(b=>`<tr><td><strong>${b.clients?.name||'—'}</strong></td><td>${b.billing_month?.substring(0,7)}</td>
-    <td style="font-family:'DM Mono',monospace;">${(b.amount||0).toLocaleString('ja-JP')}円</td>
-    <td>${b.is_billed?'<span class="badge badge-green">請求済み</span>':'<span class="badge badge-yellow">未請求</span>'}</td>
-    <td>${b.notes||'—'}</td>
-    <td style="display:flex;gap:6px;"><button class="btn btn-secondary btn-sm" onclick='openBillingModal(${JSON.stringify(b)})'>編集</button>
-    <button class="btn btn-danger btn-sm" onclick="deleteBilling('${b.id}')">削除</button></td></tr>`).join('')}
+    ${ST.billing.map(b=>`<tr>
+      <td data-label="取引先"><strong>${b.clients?.name||'—'}</strong></td>
+      <td data-label="対象月">${b.billing_month?.substring(0,7)}</td>
+      <td data-label="金額" style="font-family:'DM Mono',monospace;">${(b.amount||0).toLocaleString('ja-JP')}円</td>
+      <td data-label="状態">${b.is_billed?'<span class="badge badge-green">請求済み</span>':'<span class="badge badge-yellow">未請求</span>'}</td>
+      <td data-label="備考">${b.notes||'—'}</td>
+      <td class="no-label" style="display:flex;gap:6px;">
+        <button class="btn btn-secondary btn-sm" onclick='openBillingModal(${JSON.stringify(b)})'>編集</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteBilling('${b.id}')">削除</button>
+      </td></tr>`).join('')}
     <tr style="background:rgba(59,130,246,.05);"><td colspan="2"><strong>合計</strong></td><td colspan="4" style="font-family:'DM Mono',monospace;font-weight:700;color:var(--accent2);">${total.toLocaleString('ja-JP')}円</td></tr>
     </tbody></table>`;
 }
