@@ -450,6 +450,49 @@
     background: none; border: none; color: var(--text3); cursor: pointer; font-size: 14px;
   }
   .employee-selected .clear-btn:hover { color: var(--danger); }
+
+  /* ===== WORK PATTERNS ===== */
+  .work-pattern-row {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    margin-bottom: 8px;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr 0.8fr auto;
+    gap: 8px;
+    align-items: center;
+  }
+  .work-pattern-row input {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    outline: none;
+    width: 100%;
+  }
+  .work-pattern-row input:focus { border-color: var(--accent); }
+  .work-pattern-row .col-label {
+    font-size: 10px;
+    color: var(--text3);
+    margin-bottom: 3px;
+  }
+  .wp-delete-btn {
+    background: none;
+    border: none;
+    color: var(--text3);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color 0.15s;
+    align-self: flex-end;
+    margin-bottom: 2px;
+  }
+  .wp-delete-btn:hover { color: var(--danger); }
 </style>
 </head>
 <body>
@@ -698,15 +741,9 @@
           <input type="text" class="form-input" id="site-supervisor">
         </div>
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">職種</label>
-          <input type="text" class="form-input" id="site-job-type">
-        </div>
-        <div class="form-group">
-          <label class="form-label">就業条件</label>
-          <input type="text" class="form-input" id="site-work-conditions" placeholder="例: 9:00〜18:00">
-        </div>
+      <div class="form-group">
+        <label class="form-label">職種</label>
+        <input type="text" class="form-input" id="site-job-type">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -718,6 +755,19 @@
           <input type="date" class="form-input" id="site-contract-end">
         </div>
       </div>
+
+      <!-- 就業パターン -->
+      <div class="form-group">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+          <label class="form-label" style="margin:0;">就業パターン</label>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="addWorkPattern()">＋ パターンを追加</button>
+        </div>
+        <div id="work-patterns-list"></div>
+        <div id="work-patterns-empty" style="font-size:12px; color:var(--text3); padding:8px 0; display:none;">
+          パターンがありません。「＋ パターンを追加」で追加してください。
+        </div>
+      </div>
+
       <div class="form-group">
         <label class="form-label">備考</label>
         <textarea class="form-textarea" id="site-notes"></textarea>
@@ -1094,7 +1144,7 @@ function filterClients() {
 
 // ===== SITES =====
 async function loadSites() {
-  const { data } = await db.from('sites').select('*, clients(name)').order('name');
+  const { data } = await db.from('sites').select('*, clients(name), work_patterns(*)').order('name');
   state.sites = data || [];
   renderSites(state.sites);
 }
@@ -1106,16 +1156,21 @@ function renderSites(sites) {
     return;
   }
   el.innerHTML = `<table>
-    <thead><tr><th>現場名</th><th>企業</th><th>職種</th><th>指揮命令者</th><th>契約期間</th><th>操作</th></tr></thead>
+    <thead><tr><th>現場名</th><th>企業</th><th>職種</th><th>指揮命令者</th><th>就業パターン</th><th>契約期間</th><th>操作</th></tr></thead>
     <tbody>${sites.map(s => {
       const end = s.contract_end;
       const days = end ? Math.ceil((new Date(end) - new Date()) / 86400000) : null;
       const endCls = days !== null ? (days < 0 ? 'expiry-expired' : days < 30 ? 'expiry-near' : '') : '';
+      const patterns = (s.work_patterns || []);
+      const patternHtml = patterns.length > 0
+        ? patterns.map(p => `<div style="font-size:11px; white-space:nowrap;">${p.pattern_name}：${p.start_time?.substring(0,5)}〜${p.end_time?.substring(0,5)}（休憩${p.break_minutes}分）</div>`).join('')
+        : '<span style="color:var(--text3); font-size:11px;">未設定</span>';
       return `<tr>
         <td><strong>${s.name}</strong></td>
         <td>${s.clients?.name || '—'}</td>
         <td>${s.job_type || '—'}</td>
         <td>${s.supervisor || '—'}</td>
+        <td>${patternHtml}</td>
         <td class="${endCls}">${s.contract_start || '—'} 〜 ${s.contract_end || '—'}</td>
         <td style="display:flex;gap:6px;">
           <button class="btn btn-secondary btn-sm" onclick="openSiteModal(${JSON.stringify(s).replace(/"/g, '&quot;')})">編集</button>
@@ -1332,6 +1387,8 @@ async function deleteClient(id) {
 }
 
 // SITE MODAL
+let workPatterns = []; // モーダル内の就業パターン一時保存
+
 async function openSiteModal(site) {
   document.getElementById('modal-site-title').textContent = site ? '現場を編集' : '現場を登録';
   document.getElementById('site-id').value = site?.id || '';
@@ -1340,15 +1397,72 @@ async function openSiteModal(site) {
   document.getElementById('site-contact-person').value = site?.contact_person || '';
   document.getElementById('site-supervisor').value = site?.supervisor || '';
   document.getElementById('site-job-type').value = site?.job_type || '';
-  document.getElementById('site-work-conditions').value = site?.work_conditions || '';
   document.getElementById('site-contract-start').value = site?.contract_start || '';
   document.getElementById('site-contract-end').value = site?.contract_end || '';
   document.getElementById('site-notes').value = site?.notes || '';
+
+  // 就業パターン読み込み
+  workPatterns = [];
+  if (site?.id) {
+    const { data } = await db.from('work_patterns').select('*').eq('site_id', site.id).order('created_at');
+    workPatterns = (data || []).map(p => ({ ...p, _saved: true }));
+  }
+  renderWorkPatterns();
 
   const { data: clients } = await db.from('clients').select('id, name').order('name');
   const sel = document.getElementById('site-client-id');
   sel.innerHTML = clients.map(c => `<option value="${c.id}" ${c.id === site?.client_id ? 'selected' : ''}>${c.name}</option>`).join('');
   openModal('modal-site');
+}
+
+function renderWorkPatterns() {
+  const list = document.getElementById('work-patterns-list');
+  const empty = document.getElementById('work-patterns-empty');
+  if (workPatterns.length === 0) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  list.innerHTML = workPatterns.map((p, i) => `
+    <div class="work-pattern-row" data-index="${i}">
+      <div>
+        <div class="col-label">パターン名</div>
+        <input type="text" value="${p.pattern_name || ''}" placeholder="例: 通常・早番"
+          oninput="updateWorkPattern(${i}, 'pattern_name', this.value)">
+      </div>
+      <div>
+        <div class="col-label">開始時刻</div>
+        <input type="time" value="${p.start_time || ''}"
+          oninput="updateWorkPattern(${i}, 'start_time', this.value)">
+      </div>
+      <div>
+        <div class="col-label">終了時刻</div>
+        <input type="time" value="${p.end_time || ''}"
+          oninput="updateWorkPattern(${i}, 'end_time', this.value)">
+      </div>
+      <div>
+        <div class="col-label">休憩（分）</div>
+        <input type="number" value="${p.break_minutes ?? 60}" min="0" step="5" placeholder="60"
+          oninput="updateWorkPattern(${i}, 'break_minutes', parseInt(this.value)||0)">
+      </div>
+      <button class="wp-delete-btn" onclick="removeWorkPattern(${i})" title="削除">🗑</button>
+    </div>
+  `).join('');
+}
+
+function addWorkPattern() {
+  workPatterns.push({ pattern_name: '', start_time: '', end_time: '', break_minutes: 60, _saved: false });
+  renderWorkPatterns();
+}
+
+function updateWorkPattern(i, field, val) {
+  workPatterns[i][field] = val;
+}
+
+function removeWorkPattern(i) {
+  workPatterns.splice(i, 1);
+  renderWorkPatterns();
 }
 
 async function saveSite() {
@@ -1360,15 +1474,38 @@ async function saveSite() {
     contact_person: document.getElementById('site-contact-person').value,
     supervisor: document.getElementById('site-supervisor').value,
     job_type: document.getElementById('site-job-type').value,
-    work_conditions: document.getElementById('site-work-conditions').value,
+    work_conditions: null,
     contract_start: document.getElementById('site-contract-start').value || null,
     contract_end: document.getElementById('site-contract-end').value || null,
     notes: document.getElementById('site-notes').value,
     updated_at: new Date().toISOString(),
   };
   if (!payload.name || !payload.client_id) { toast('必須項目を入力してください', 'error'); return; }
-  const { error } = id ? await db.from('sites').update(payload).eq('id', id) : await db.from('sites').insert(payload);
-  if (error) { toast('保存に失敗しました', 'error'); return; }
+
+  let siteId = id;
+  if (id) {
+    const { error } = await db.from('sites').update(payload).eq('id', id);
+    if (error) { toast('保存に失敗しました', 'error'); return; }
+  } else {
+    const { data, error } = await db.from('sites').insert(payload).select('id').single();
+    if (error) { toast('保存に失敗しました', 'error'); return; }
+    siteId = data.id;
+  }
+
+  // 就業パターン保存：既存を全削除して再挿入
+  await db.from('work_patterns').delete().eq('site_id', siteId);
+  const validPatterns = workPatterns.filter(p => p.pattern_name && p.start_time && p.end_time);
+  if (validPatterns.length > 0) {
+    await db.from('work_patterns').insert(validPatterns.map(p => ({
+      site_id: siteId,
+      pattern_name: p.pattern_name,
+      start_time: p.start_time,
+      end_time: p.end_time,
+      break_minutes: p.break_minutes ?? 60,
+      notes: p.notes || null,
+    })));
+  }
+
   toast(id ? '現場を更新しました' : '現場を登録しました', 'success');
   closeModal('modal-site');
   loadSites();
