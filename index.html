@@ -497,6 +497,72 @@
 </head>
 <body>
 
+<!-- ===== LOGIN SCREEN ===== -->
+<div id="login-screen" style="display:none;">
+  <div class="login-bg">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="login-logo-icon">📋</div>
+        <h1>派遣管理台帳</h1>
+        <p>KAKUZEN</p>
+      </div>
+      <div class="login-form">
+        <div class="form-group">
+          <label class="form-label">パスワード</label>
+          <input type="password" class="form-input" id="login-password"
+            placeholder="パスワードを入力"
+            onkeydown="if(event.key==='Enter') doLogin()">
+        </div>
+        <div id="login-error" style="display:none; color:var(--danger); font-size:12px; margin-bottom:12px;">
+          ❌ パスワードが違います
+        </div>
+        <button class="btn btn-primary" style="width:100%; justify-content:center;" onclick="doLogin()">
+          ログイン
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .login-bg {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+  .login-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px;
+    width: 360px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .login-logo {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .login-logo-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+  }
+  .login-logo h1 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent2);
+  }
+  .login-logo p {
+    font-size: 12px;
+    color: var(--text3);
+    font-family: 'DM Mono', monospace;
+    margin-top: 4px;
+  }
+</style>
+
 <!-- SIDEBAR -->
 <nav id="sidebar">
   <div class="sidebar-logo">
@@ -1723,8 +1789,37 @@ document.addEventListener('click', e => {
   }
 });
 
+// ===== LOGIN =====
+const PASSWORD = 'kakuzen2026'; // ← ここを変更してください
+
+function checkLogin() {
+  const saved = sessionStorage.getItem('dispatch_auth');
+  if (saved === PASSWORD) {
+    showApp();
+  } else {
+    document.getElementById('login-screen').style.display = 'block';
+  }
+}
+
+function doLogin() {
+  const input = document.getElementById('login-password').value;
+  if (input === PASSWORD) {
+    sessionStorage.setItem('dispatch_auth', PASSWORD);
+    document.getElementById('login-screen').style.display = 'none';
+    showApp();
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+    document.getElementById('login-password').value = '';
+    document.getElementById('login-password').focus();
+  }
+}
+
+function showApp() {
+  loadDashboard();
+}
+
 // ===== INIT =====
-loadDashboard();
+checkLogin();
 </script>
 </body>
 </html>
