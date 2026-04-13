@@ -1130,6 +1130,10 @@ async function saveContract(){
   else{const {data,error}=await db.from('contracts').insert(p).select('id').single();if(error){toast('保存に失敗しました','error');return;}cid=data.id;}
   await db.from('contract_employees').delete().eq('contract_id',cid);
   await db.from('contract_employees').insert(selEmps.map(e=>({contract_id:cid,employee_id:e.id,employment_type:e.employment_type,is_active:true})));
+
+  // 従業員管理台帳のdispatch_contractsに同期
+  await syncDispatchContracts(cid, p.contract_start, p.contract_end, p.contract_no);
+
   toast('契約を保存しました','success');closeModal('modal-contract');loadContracts();
 }
 
@@ -1166,8 +1170,35 @@ async function execRenewal(){
     ryokin_tani:orig.ryokin_tani,notes:orig.notes,status:'active',updated_at:new Date().toISOString(),
   }).select('id').single();
   await db.from('contract_employees').insert((orig.contract_employees||[]).map(e=>({contract_id:nc.id,employee_id:e.employee_id,employment_type:e.employment_type,is_active:true})));
+
+  // 従業員管理台帳のdispatch_contractsに同期
+  await syncDispatchContracts(nc.id, ns, ne, newNo);
+
   toast('契約を更新しました','success');closeModal('modal-renewal');loadContracts();
   if(ST.page==='dashboard') loadDashboard();
+}
+
+// ===== SYNC TO 従業員管理台帳 =====
+async function syncDispatchContracts(contractId, startDate, endDate, contractNo){
+  try {
+    const {data:c}=await db.from('contracts')
+      .select('*,sites(name,clients(name)),contract_employees(*)')
+      .eq('id',contractId).single();
+    if(!c)return;
+    const siteName=c.sites?.name||'';
+    const clientName=c.sites?.clients?.name||'';
+    await empDb.from('dispatch_contracts').delete().eq('dispatch_app_contract_id',contractId);
+    const records=(c.contract_employees||[]).map(ce=>({
+      employee_id:ce.employee_id,
+      contract_no:contractNo,
+      contract_start:startDate,
+      contract_end:endDate,
+      site_name:siteName,
+      client_name:clientName,
+      dispatch_app_contract_id:contractId,
+    }));
+    if(records.length) await empDb.from('dispatch_contracts').insert(records);
+  } catch(e){ console.warn('従業員管理台帳への同期失敗:', e); }
 }
 
 // ===== DOCS MODAL =====
@@ -1188,13 +1219,12 @@ async function openDocsModal(cid){
     <button class="doc-btn" onclick="genDoc('kobetsu')"><span class="doc-icon">📋</span><div class="doc-info"><div class="doc-title">個別契約書</div><div class="doc-sub">派遣法26条・現場単位</div></div></button>
     <button class="doc-btn" onclick="genDoc('sakicho')"><span class="doc-icon">📊</span><div class="doc-info"><div class="doc-title">派遣先管理台帳</div><div class="doc-sub">派遣法42条・現場単位</div></div></button>
     <button class="doc-btn" onclick="genDoc('motocho')"><span class="doc-icon">📁</span><div class="doc-info"><div class="doc-title">派遣元管理台帳</div><div class="doc-sub">派遣法37条・現場単位</div></div></button>`;
-  // スタッフごとのボタン
+  // スタッフごとのボタン（雇用契約書兼就業条件明示書のみ）
   const empBtnsHtml=(c.contract_employees||[]).map(ce=>{
     const emp=empData[ce.employee_id];const name=emp?`${emp.sei} ${emp.mei}`:`ID:${ce.employee_id}`;
     const isFixed=ce.employment_type==='fixed';
     return`<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2);">👤 ${name}（${isFixed?'有期':'無期'}）</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="doc-btn btn-sm" style="padding:8px 12px;" onclick="genEmpDoc('koyo','${ce.employee_id}')"><span class="doc-icon" style="font-size:16px;">📝</span><div class="doc-info"><div class="doc-title" style="font-size:12px;">雇用契約書</div></div></button>
         <button class="doc-btn btn-sm" style="padding:8px 12px;" onclick="genEmpDoc('koyo_joken','${ce.employee_id}')"><span class="doc-icon" style="font-size:16px;">📑</span><div class="doc-info"><div class="doc-title" style="font-size:12px;">雇用契約書兼就業条件明示書</div></div></button>
       </div></div>`;
   }).join('');
@@ -1535,11 +1565,11 @@ async function genAllDocs(){
     const text=replacePlaceholders(tmpl.body,ph);
     await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${c.contract_no||'doc'}.docx`);
   }
-  // スタッフごと
+  // スタッフごと（雇用契約書兼就業条件明示書・管理台帳）
   for(const ce of(c.contract_employees||[])){
     const emp=(c._empData||{})[ce.employee_id];
     const name=emp?`${emp.sei}${emp.mei}`:`ID${ce.employee_id}`;
-    for(const type of['sakicho','motocho','koyo','koyo_joken']){
+    for(const type of['sakicho','motocho','koyo_joken']){
       const tmpl=TEMPLATES[type];
       const ph=buildPlaceholders(c,emp,settings);
       const text=replacePlaceholders(tmpl.body,ph);
