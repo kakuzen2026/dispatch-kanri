@@ -283,7 +283,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
       <div class="form-group"><label class="form-label">住所</label><input type="text" class="form-input" id="c-address"></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">代表者名</label><input type="text" class="form-input" id="c-ceo"></div>
-        <div class="form-group"><label class="form-label">担当者名</label><input type="text" class="form-input" id="c-contact-person"></div>
+        <div class="form-group"><label class="form-label">役職</label><input type="text" class="form-input" id="c-contact-person"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">電話番号</label><input type="text" class="form-input" id="c-contact-phone"></div>
@@ -310,16 +310,8 @@ tr:hover td{background:rgba(255,255,255,.02);}
       </div>
       <div class="form-group"><label class="form-label">現場住所</label><input type="text" class="form-input" id="s-address-site"></div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">担当者</label><input type="text" class="form-input" id="s-contact-person"></div>
-        <div class="form-group"><label class="form-label">指揮命令者（氏名）</label><input type="text" class="form-input" id="s-supervisor"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">指揮命令者（部署）</label><input type="text" class="form-input" id="s-cmd-dept"></div>
-        <div class="form-group"><label class="form-label">指揮命令者（役職）</label><input type="text" class="form-input" id="s-cmd-title"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">指揮命令者（電話）</label><input type="text" class="form-input" id="s-cmd-tel"></div>
         <div class="form-group"><label class="form-label">職種</label><input type="text" class="form-input" id="s-job-type"></div>
+        <div class="form-group"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">組織単位</label><input type="text" class="form-input" id="s-org-unit"></div>
@@ -345,6 +337,17 @@ tr:hover td{background:rgba(255,255,255,.02);}
           <div class="form-group"><label class="form-label">氏名</label><input type="text" class="form-input" id="s-client-mgr-name"></div>
         </div>
         <div class="form-group"><label class="form-label">電話番号</label><input type="text" class="form-input" id="s-client-mgr-tel"></div>
+      </div>
+
+      <!-- 指揮命令者 -->
+      <div class="form-section">
+        <div class="form-section-title">指揮命令者</div>
+        <div class="form-row-3">
+          <div class="form-group"><label class="form-label">部署</label><input type="text" class="form-input" id="s-cmd-dept"></div>
+          <div class="form-group"><label class="form-label">役職</label><input type="text" class="form-input" id="s-cmd-title"></div>
+          <div class="form-group"><label class="form-label">氏名</label><input type="text" class="form-input" id="s-supervisor"></div>
+        </div>
+        <div class="form-group"><label class="form-label">電話番号</label><input type="text" class="form-input" id="s-cmd-tel"></div>
       </div>
 
       <!-- 苦情申出先（派遣先） -->
@@ -679,6 +682,14 @@ function filterSites(){const q=document.getElementById('search-sites').value.toL
 
 async function openSiteModal(site){
   document.getElementById('ms-title').textContent=site?'現場を編集':'現場を登録';
+  const DEFAULT_SAFETY = `派遣先は、派遣労働者の安全衛生に関し、労働安全衛生法等関係法令を遵守し、必要な措置を講ずるものとする。
+・就業場所の安全管理、衛生管理を適切に行うこと
+・危険・有害業務に従事させる場合は、必要な安全衛生教育を実施すること
+・健康診断の実施については労働安全衛生法の定めによる
+・派遣労働者が労働災害等を被った場合は、直ちに派遣元に通知すること`;
+
+  const DEFAULT_WELFARE = `派遣先は、派遣労働者が利用できる福利厚生施設（給食施設・休憩室・更衣室）について、派遣先の労働者と同等の利用を認めるものとする。`;
+
   const fields={
     's-id':'id','s-name':'name','s-address-site':'address','s-contact-person':'contact_person',
     's-supervisor':'supervisor','s-cmd-dept':'cmd_dept','s-cmd-title':'cmd_title','s-cmd-tel':'cmd_tel',
@@ -686,9 +697,12 @@ async function openSiteModal(site){
     's-client-mgr-dept':'client_mgr_dept','s-client-mgr-title':'client_mgr_title','s-client-mgr-name':'client_mgr_name','s-client-mgr-tel':'client_mgr_tel',
     's-complaint-client-dept':'complaint_client_dept','s-complaint-client-title':'complaint_client_title','s-complaint-client-name':'complaint_client_name','s-complaint-client-tel':'complaint_client_tel',
     's-haken-mgr-dept-site':'haken_mgr_dept','s-haken-mgr-title-site':'haken_mgr_title','s-haken-mgr-name-site':'haken_mgr_name','s-haken-mgr-tel-site':'haken_mgr_tel',
-    's-safety':'safety_content','s-welfare':'welfare_content','s-notes-site':'notes',
+    's-notes-site':'notes',
   };
   Object.entries(fields).forEach(([elId,key])=>{ document.getElementById(elId).value=site?.[key]||''; });
+  // 安全衛生・福祉：既存データがあればそれを表示、なければデフォルト文言
+  document.getElementById('s-safety').value = site?.safety_content || DEFAULT_SAFETY;
+  document.getElementById('s-welfare').value = site?.welfare_content || DEFAULT_WELFARE;
   wpList=[];
   if(site?.id){const {data}=await db.from('work_patterns').select('*').eq('site_id',site.id).order('created_at');wpList=(data||[]).map(p=>({...p}));}
   renderWP();
@@ -781,6 +795,7 @@ function renderContracts(){
         <td><span class="badge badge-blue">${cnt}名</span></td><td>${stBadge(x.status,x.contract_end)}</td>
         <td style="display:flex;gap:4px;flex-wrap:wrap;">
           <button class="btn btn-secondary btn-sm" onclick="openCtDetail('${x.id}')">詳細</button>
+          <button class="btn btn-secondary btn-sm" onclick="openContractModal('${x.id}')">編集</button>
           <button class="btn btn-purple btn-sm" onclick="openDocsModal('${x.id}')">📄 書類</button>
           ${x.status==='active'?`<button class="btn btn-warning btn-sm" onclick="openRenewalModal('${x.id}')">🔄 更新</button>`:''}
           ${x.status==='active'?`<button class="btn btn-danger btn-sm" onclick="endContract('${x.id}')">終了</button>`:''}
@@ -817,6 +832,7 @@ async function openCtDetail(cid){
     ${c.notes?`<div class="alert alert-info" style="margin-top:12px;">📝 ${c.notes}</div>`:''}`;
   document.getElementById('ctd-footer').innerHTML=`
     <button class="btn btn-secondary" onclick="closeModal('modal-ct-detail')">閉じる</button>
+    <button class="btn btn-secondary" onclick="closeModal('modal-ct-detail');openContractModal('${c.id}')">✏️ 編集</button>
     <button class="btn btn-purple" onclick="closeModal('modal-ct-detail');openDocsModal('${c.id}')">📄 書類を生成</button>
     ${c.status==='active'?`<button class="btn btn-warning" onclick="closeModal('modal-ct-detail');openRenewalModal('${c.id}')">🔄 契約を更新</button>`:''}
     ${c.status==='active'?`<button class="btn btn-danger" onclick="closeModal('modal-ct-detail');endContract('${c.id}')">契約を終了</button>`:''}`;
@@ -865,18 +881,55 @@ function renderSelEmps(){
     </div>`).join('');
 }
 
-async function openContractModal(){
-  document.getElementById('mct-title').textContent='契約を作成';
-  ['ct-id','ct-parent-id','ct-start','ct-end','ct-notes','ct-job-detail','ct-authority','ct-overtime','ct-work-days','ct-ryokin','ct-ryokin-tani'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('ct-type').value='';document.getElementById('ct-renewal').value='0';
-  document.getElementById('ct-jissai-date').value='';document.getElementById('ct-soshiki-date').value='';
-  selEmps=[];empCache=null;renderSelEmps();
-  document.getElementById('ct-emp-dd').style.display='none';document.getElementById('ct-emp-search').value='';
-  // 契約番号自動生成
-  const no=await generateContractNo();
-  document.getElementById('ct-no').value=no;
+async function openContractModal(cid){
+  // 編集モード：既存契約IDが渡された場合はDBから取得
+  let existing = null;
+  if(cid){
+    const {data}=await db.from('contracts').select('*,contract_employees(*)').eq('id',cid).single();
+    existing=data;
+  }
+
+  document.getElementById('mct-title').textContent=existing?'契約を編集':'契約を作成';
+  document.getElementById('ct-id').value=existing?.id||'';
+  document.getElementById('ct-parent-id').value='';
+  document.getElementById('ct-no').value=existing?.contract_no||(await generateContractNo());
+  document.getElementById('ct-start').value=existing?.contract_start||'';
+  document.getElementById('ct-end').value=existing?.contract_end||'';
+  document.getElementById('ct-type').value=existing?.contract_type||'';
+  document.getElementById('ct-renewal').value=existing?.renewal_count||0;
+  document.getElementById('ct-job-detail').value=existing?.job_detail||'';
+  document.getElementById('ct-authority').value=existing?.authority_detail||'';
+  document.getElementById('ct-overtime').value=existing?.overtime_rule||'';
+  document.getElementById('ct-work-days').value=existing?.work_days||'';
+  document.getElementById('ct-ryokin').value=existing?.haken_ryokin||'';
+  document.getElementById('ct-ryokin-tani').value=existing?.ryokin_tani||'';
+  document.getElementById('ct-jissai-date').value=existing?.jissai_shokuchoku_date||'';
+  document.getElementById('ct-soshiki-date').value=existing?.soshiki_shokuchoku_date||'';
+  document.getElementById('ct-notes').value=existing?.notes||'';
+
+  // スタッフ選択：編集時は既存スタッフを復元
+  selEmps=[];empCache=null;
+  if(existing?.contract_employees?.length){
+    // 従業員台帳から名前を取得
+    const empIds=existing.contract_employees.map(e=>e.employee_id);
+    const {data:emps}=await empDb.from('employees').select('id,sei,mei').in('id',empIds);
+    const nameMap={};(emps||[]).forEach(e=>nameMap[e.id]=`${e.sei} ${e.mei}`);
+    selEmps=existing.contract_employees.map(e=>({
+      id:e.employee_id,
+      name:nameMap[e.employee_id]||`ID:${e.employee_id}`,
+      employment_type:e.employment_type||'fixed',
+    }));
+  }
+  renderSelEmps();
+  document.getElementById('ct-emp-dd').style.display='none';
+  document.getElementById('ct-emp-search').value='';
+
+  // 現場リスト
   const {data:sites}=await db.from('sites').select('id,name,clients(name)').order('name');
-  document.getElementById('ct-site-id').innerHTML=(sites||[]).map(s=>`<option value="${s.id}">${s.clients?.name||''} / ${s.name}</option>`).join('');
+  document.getElementById('ct-site-id').innerHTML=(sites||[]).map(s=>
+    `<option value="${s.id}" ${s.id===existing?.site_id?'selected':''}>${s.clients?.name||''} / ${s.name}</option>`
+  ).join('');
+
   openModal('modal-contract');
 }
 
