@@ -409,6 +409,47 @@
 
   .expiry-near { color: var(--warning); }
   .expiry-expired { color: var(--danger); }
+
+  /* ===== EMPLOYEE SEARCH ===== */
+  .employee-search-wrap { position: relative; }
+  .employee-search-wrap input { width: 100%; }
+  .employee-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0; right: 0;
+    background: var(--bg3);
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    z-index: 300;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .employee-option {
+    padding: 9px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .employee-option:last-child { border-bottom: none; }
+  .employee-option:hover { background: rgba(59,130,246,0.15); }
+  .employee-option .emp-id { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); }
+  .employee-selected {
+    background: rgba(59,130,246,0.1);
+    border: 1px solid rgba(59,130,246,0.3);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .employee-selected .clear-btn {
+    background: none; border: none; color: var(--text3); cursor: pointer; font-size: 14px;
+  }
+  .employee-selected .clear-btn:hover { color: var(--danger); }
 </style>
 </head>
 <body>
@@ -698,16 +739,21 @@
     </div>
     <div class="modal-body">
       <input type="hidden" id="assignment-id">
-      <div class="alert alert-info">
-        ℹ️ スタッフIDは従業員管理台帳のIDを入力してください
-      </div>
+      <input type="hidden" id="assignment-employee-id">
+      <input type="hidden" id="assignment-employee-name">
       <div class="form-group">
-        <label class="form-label">スタッフID（従業員台帳）<span class="required">*</span></label>
-        <input type="text" class="form-input" id="assignment-employee-id" placeholder="UUID">
-      </div>
-      <div class="form-group">
-        <label class="form-label">スタッフ名（参考表示用）</label>
-        <input type="text" class="form-input" id="assignment-employee-name" placeholder="表示用の名前">
+        <label class="form-label">スタッフを検索<span class="required">*</span></label>
+        <div id="employee-selected-display" style="display:none;" class="employee-selected">
+          <span id="employee-selected-label"></span>
+          <button class="clear-btn" onclick="clearEmployeeSelection()">✕</button>
+        </div>
+        <div id="employee-search-wrap" class="employee-search-wrap">
+          <input type="text" class="form-input" id="employee-search-input"
+            placeholder="姓・名で検索（例：山田、TAKAMORI）"
+            oninput="searchEmployees(this.value)"
+            autocomplete="off">
+          <div class="employee-dropdown" id="employee-dropdown" style="display:none;"></div>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">配属現場<span class="required">*</span></label>
@@ -831,8 +877,11 @@
 // ===== SUPABASE INIT =====
 const SUPABASE_URL = 'https://wkzbsdfgslidubqpifwa.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_mfVmygJgUjnax83quON02Q_KMdYfF-Y';
+const EMP_URL = 'https://jqokhqybxjkcantxsjfm.supabase.co';
+const EMP_KEY = 'sb_publishable_xrJBbuf8RlXbz_achTcVTw_kGZE8Yu4';
 const { createClient } = supabase;
 const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+const empDb = createClient(EMP_URL, EMP_KEY);
 
 // ===== STATE =====
 let state = {
@@ -844,6 +893,60 @@ let state = {
   currentPage: 'dashboard',
   assignmentTab: 'active',
 };
+
+// ===== EMPLOYEE SEARCH =====
+let empSearchTimer = null;
+
+async function searchEmployees(q) {
+  const dropdown = document.getElementById('employee-dropdown');
+  if (!q || q.length < 1) { dropdown.style.display = 'none'; return; }
+
+  clearTimeout(empSearchTimer);
+  empSearchTimer = setTimeout(async () => {
+    dropdown.innerHTML = '<div style="padding:10px 12px; font-size:12px; color:var(--text3);">検索中...</div>';
+    dropdown.style.display = 'block';
+
+    const { data, error } = await empDb.from('employees')
+      .select('id, sei, mei, seikana, meikana')
+      .or(`sei.ilike.%${q}%,mei.ilike.%${q}%,seikana.ilike.%${q}%,meikana.ilike.%${q}%`)
+      .limit(20);
+
+    if (error || !data || data.length === 0) {
+      dropdown.innerHTML = '<div style="padding:10px 12px; font-size:12px; color:var(--text3);">該当者なし</div>';
+      return;
+    }
+
+    dropdown.innerHTML = data.map(e => {
+      const name = `${e.sei} ${e.mei}`;
+      const kana = `${e.seikana || ''} ${e.meikana || ''}`.trim();
+      return `<div class="employee-option" onclick="selectEmployee(${e.id}, '${name.replace(/'/g,"\\'")}')">
+        <div>
+          <div style="font-weight:500;">${name}</div>
+          ${kana ? `<div style="font-size:11px; color:var(--text3);">${kana}</div>` : ''}
+        </div>
+        <span class="emp-id">ID: ${e.id}</span>
+      </div>`;
+    }).join('');
+  }, 300);
+}
+
+function selectEmployee(id, name) {
+  document.getElementById('assignment-employee-id').value = id;
+  document.getElementById('assignment-employee-name').value = name;
+  document.getElementById('employee-selected-label').textContent = `${name}（ID: ${id}）`;
+  document.getElementById('employee-selected-display').style.display = 'flex';
+  document.getElementById('employee-search-wrap').style.display = 'none';
+  document.getElementById('employee-dropdown').style.display = 'none';
+}
+
+function clearEmployeeSelection() {
+  document.getElementById('assignment-employee-id').value = '';
+  document.getElementById('assignment-employee-name').value = '';
+  document.getElementById('employee-selected-display').style.display = 'none';
+  document.getElementById('employee-search-wrap').style.display = 'block';
+  document.getElementById('employee-search-input').value = '';
+  document.getElementById('employee-dropdown').style.display = 'none';
+}
 
 // ===== NAVIGATION =====
 function navigate(page) {
@@ -1282,12 +1385,27 @@ async function deleteSite(id) {
 async function openAssignmentModal(a) {
   document.getElementById('modal-assignment-title').textContent = a ? '配属を編集' : 'スタッフを配属';
   document.getElementById('assignment-id').value = a?.id || '';
-  document.getElementById('assignment-employee-id').value = a?.employee_id || '';
-  document.getElementById('assignment-employee-name').value = a?.notes || '';
   document.getElementById('assignment-start-date').value = a?.start_date || '';
   document.getElementById('assignment-end-date').value = a?.end_date || '';
   document.getElementById('assignment-management-type').value = a?.management_type || 'self';
   document.getElementById('assignment-notes').value = a?.notes || '';
+
+  // 従業員選択UIリセット
+  clearEmployeeSelection();
+  if (a?.employee_id) {
+    // 既存データの場合は名前を取得して表示
+    const { data: emp } = await empDb.from('employees').select('id, sei, mei').eq('id', a.employee_id).maybeSingle();
+    if (emp) {
+      selectEmployee(emp.id, `${emp.sei} ${emp.mei}`);
+    } else {
+      // 台帳に見つからない場合はIDをそのまま表示
+      document.getElementById('assignment-employee-id').value = a.employee_id;
+      document.getElementById('assignment-employee-name').value = a.employee_id;
+      document.getElementById('employee-selected-label').textContent = `ID: ${a.employee_id}`;
+      document.getElementById('employee-selected-display').style.display = 'flex';
+      document.getElementById('employee-search-wrap').style.display = 'none';
+    }
+  }
 
   const { data: sites } = await db.from('sites').select('id, name, clients(name)').order('name');
   const sel = document.getElementById('assignment-site-id');
@@ -1297,17 +1415,20 @@ async function openAssignmentModal(a) {
 
 async function saveAssignment() {
   const id = document.getElementById('assignment-id').value;
+  const employeeId = document.getElementById('assignment-employee-id').value;
+  const employeeName = document.getElementById('assignment-employee-name').value;
   const payload = {
-    employee_id: document.getElementById('assignment-employee-id').value,
+    employee_id: employeeId,
     site_id: document.getElementById('assignment-site-id').value,
     management_type: document.getElementById('assignment-management-type').value,
     start_date: document.getElementById('assignment-start-date').value,
     end_date: document.getElementById('assignment-end-date').value || null,
-    notes: document.getElementById('assignment-notes').value,
+    notes: employeeName,
     is_active: true,
     updated_at: new Date().toISOString(),
   };
-  if (!payload.employee_id || !payload.site_id || !payload.start_date) { toast('必須項目を入力してください', 'error'); return; }
+  if (!payload.employee_id) { toast('スタッフを選択してください', 'error'); return; }
+  if (!payload.site_id || !payload.start_date) { toast('必須項目を入力してください', 'error'); return; }
   const { error } = id ? await db.from('assignments').update(payload).eq('id', id) : await db.from('assignments').insert(payload);
   if (error) { toast('保存に失敗しました', 'error'); return; }
   toast(id ? '配属を更新しました' : '配属を登録しました', 'success');
@@ -1454,6 +1575,15 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', e => {
     if (e.target === overlay) overlay.classList.remove('open');
   });
+});
+
+// 従業員検索ドロップダウンを外クリックで閉じる
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('employee-search-wrap');
+  const dropdown = document.getElementById('employee-dropdown');
+  if (wrap && !wrap.contains(e.target)) {
+    dropdown.style.display = 'none';
+  }
 });
 
 // ===== INIT =====
