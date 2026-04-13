@@ -811,16 +811,6 @@
         <label class="form-label">職種</label>
         <input type="text" class="form-input" id="site-job-type">
       </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">契約開始日</label>
-          <input type="date" class="form-input" id="site-contract-start">
-        </div>
-        <div class="form-group">
-          <label class="form-label">契約終了日</label>
-          <input type="date" class="form-input" id="site-contract-end">
-        </div>
-      </div>
 
       <!-- 就業パターン -->
       <div class="form-group">
@@ -858,15 +848,16 @@
       <input type="hidden" id="assignment-employee-id">
       <input type="hidden" id="assignment-employee-name">
       <div class="form-group">
-        <label class="form-label">スタッフを検索<span class="required">*</span></label>
+        <label class="form-label">スタッフ<span class="required">*</span></label>
         <div id="employee-selected-display" style="display:none;" class="employee-selected">
           <span id="employee-selected-label"></span>
-          <button class="clear-btn" onclick="clearEmployeeSelection()">✕</button>
+          <button class="clear-btn" onclick="clearEmployeeSelection()">✕ 変更</button>
         </div>
         <div id="employee-search-wrap" class="employee-search-wrap">
           <input type="text" class="form-input" id="employee-search-input"
-            placeholder="姓・名で検索（例：山田、TAKAMORI）"
+            placeholder="クリックで一覧表示・文字入力で絞り込み"
             oninput="searchEmployees(this.value)"
+            onfocus="searchEmployees(this.value)"
             autocomplete="off">
           <div class="employee-dropdown" id="employee-dropdown" style="display:none;"></div>
         </div>
@@ -1012,27 +1003,45 @@ let state = {
 
 // ===== EMPLOYEE SEARCH =====
 let empSearchTimer = null;
+let empAllCache = null; // 全件キャッシュ
 
 async function searchEmployees(q) {
   const dropdown = document.getElementById('employee-dropdown');
-  if (!q || q.length < 1) { dropdown.style.display = 'none'; return; }
 
   clearTimeout(empSearchTimer);
   empSearchTimer = setTimeout(async () => {
-    dropdown.innerHTML = '<div style="padding:10px 12px; font-size:12px; color:var(--text3);">検索中...</div>';
+    dropdown.innerHTML = '<div style="padding:10px 12px; font-size:12px; color:var(--text3);">読み込み中...</div>';
     dropdown.style.display = 'block';
 
-    const { data, error } = await empDb.from('employees')
-      .select('id, sei, mei, seikana, meikana')
-      .or(`sei.ilike.%${q}%,mei.ilike.%${q}%,seikana.ilike.%${q}%,meikana.ilike.%${q}%`)
-      .limit(20);
+    // 全件キャッシュがなければ取得
+    if (!empAllCache) {
+      const { data, error } = await empDb.from('employees')
+        .select('id, sei, mei, seikana, meikana')
+        .order('sei')
+        .limit(200);
+      if (error) {
+        dropdown.innerHTML = '<div style="padding:10px 12px; font-size:12px; color:var(--danger);">取得エラー</div>';
+        return;
+      }
+      empAllCache = data || [];
+    }
 
-    if (error || !data || data.length === 0) {
+    // フィルタリング
+    const filtered = q
+      ? empAllCache.filter(e =>
+          (e.sei||'').toLowerCase().includes(q.toLowerCase()) ||
+          (e.mei||'').toLowerCase().includes(q.toLowerCase()) ||
+          (e.seikana||'').includes(q) ||
+          (e.meikana||'').includes(q)
+        )
+      : empAllCache;
+
+    if (filtered.length === 0) {
       dropdown.innerHTML = '<div style="padding:10px 12px; font-size:12px; color:var(--text3);">該当者なし</div>';
       return;
     }
 
-    dropdown.innerHTML = data.map(e => {
+    dropdown.innerHTML = filtered.map(e => {
       const name = `${e.sei} ${e.mei}`;
       const kana = `${e.seikana || ''} ${e.meikana || ''}`.trim();
       return `<div class="employee-option" onclick="selectEmployee(${e.id}, '${name.replace(/'/g,"\\'")}')">
@@ -1043,7 +1052,7 @@ async function searchEmployees(q) {
         <span class="emp-id">ID: ${e.id}</span>
       </div>`;
     }).join('');
-  }, 300);
+  }, q ? 200 : 0); // 空の場合は即表示
 }
 
 function selectEmployee(id, name) {
@@ -1222,11 +1231,8 @@ function renderSites(sites) {
     return;
   }
   el.innerHTML = `<table>
-    <thead><tr><th>現場名</th><th>企業</th><th>職種</th><th>指揮命令者</th><th>就業パターン</th><th>契約期間</th><th>操作</th></tr></thead>
+    <thead><tr><th>現場名</th><th>企業</th><th>職種</th><th>指揮命令者</th><th>就業パターン</th><th>操作</th></tr></thead>
     <tbody>${sites.map(s => {
-      const end = s.contract_end;
-      const days = end ? Math.ceil((new Date(end) - new Date()) / 86400000) : null;
-      const endCls = days !== null ? (days < 0 ? 'expiry-expired' : days < 30 ? 'expiry-near' : '') : '';
       const patterns = (s.work_patterns || []);
       const patternHtml = patterns.length > 0
         ? patterns.map(p => `<div style="font-size:11px; white-space:nowrap;">${p.pattern_name}：${p.start_time?.substring(0,5)}〜${p.end_time?.substring(0,5)}（休憩${p.break_minutes}分）</div>`).join('')
@@ -1237,7 +1243,6 @@ function renderSites(sites) {
         <td>${s.job_type || '—'}</td>
         <td>${s.supervisor || '—'}</td>
         <td>${patternHtml}</td>
-        <td class="${endCls}">${s.contract_start || '—'} 〜 ${s.contract_end || '—'}</td>
         <td style="display:flex;gap:6px;">
           <button class="btn btn-secondary btn-sm" onclick="openSiteModal(${JSON.stringify(s).replace(/"/g, '&quot;')})">編集</button>
           <button class="btn btn-danger btn-sm" onclick="deleteSite('${s.id}')">削除</button>
@@ -1463,8 +1468,6 @@ async function openSiteModal(site) {
   document.getElementById('site-contact-person').value = site?.contact_person || '';
   document.getElementById('site-supervisor').value = site?.supervisor || '';
   document.getElementById('site-job-type').value = site?.job_type || '';
-  document.getElementById('site-contract-start').value = site?.contract_start || '';
-  document.getElementById('site-contract-end').value = site?.contract_end || '';
   document.getElementById('site-notes').value = site?.notes || '';
 
   // 就業パターン読み込み
@@ -1495,22 +1498,23 @@ function renderWorkPatterns() {
       <div>
         <div class="col-label">パターン名</div>
         <input type="text" value="${p.pattern_name || ''}" placeholder="例: 通常・早番"
+          onchange="updateWorkPattern(${i}, 'pattern_name', this.value)"
           oninput="updateWorkPattern(${i}, 'pattern_name', this.value)">
       </div>
       <div>
         <div class="col-label">開始時刻</div>
-        <input type="time" value="${p.start_time || ''}"
-          oninput="updateWorkPattern(${i}, 'start_time', this.value)">
+        <input type="time" value="${p.start_time ? p.start_time.substring(0,5) : ''}"
+          onchange="updateWorkPattern(${i}, 'start_time', this.value)">
       </div>
       <div>
         <div class="col-label">終了時刻</div>
-        <input type="time" value="${p.end_time || ''}"
-          oninput="updateWorkPattern(${i}, 'end_time', this.value)">
+        <input type="time" value="${p.end_time ? p.end_time.substring(0,5) : ''}"
+          onchange="updateWorkPattern(${i}, 'end_time', this.value)">
       </div>
       <div>
         <div class="col-label">休憩（分）</div>
         <input type="number" value="${p.break_minutes ?? 60}" min="0" step="5" placeholder="60"
-          oninput="updateWorkPattern(${i}, 'break_minutes', parseInt(this.value)||0)">
+          onchange="updateWorkPattern(${i}, 'break_minutes', parseInt(this.value)||0)">
       </div>
       <button class="wp-delete-btn" onclick="removeWorkPattern(${i})" title="削除">🗑</button>
     </div>
@@ -1541,8 +1545,6 @@ async function saveSite() {
     supervisor: document.getElementById('site-supervisor').value,
     job_type: document.getElementById('site-job-type').value,
     work_conditions: null,
-    contract_start: document.getElementById('site-contract-start').value || null,
-    contract_end: document.getElementById('site-contract-end').value || null,
     notes: document.getElementById('site-notes').value,
     updated_at: new Date().toISOString(),
   };
@@ -1592,6 +1594,9 @@ async function openAssignmentModal(a) {
   document.getElementById('assignment-end-date').value = a?.end_date || '';
   document.getElementById('assignment-management-type').value = a?.management_type || 'self';
   document.getElementById('assignment-notes').value = a?.notes || '';
+
+  // キャッシュリセット（モーダルを開くたびに最新を取得）
+  empAllCache = null;
 
   // 従業員選択UIリセット
   clearEmployeeSelection();
