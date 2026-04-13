@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>派遣管理台帳</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0f1117;
+    --bg2: #161b27;
+    --bg3: #1e2535;
+    --border: #2a3347;
+    --accent: #3b82f6;
+    --accent2: #60a5fa;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --text3: #64748b;
+    --radius: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+  }
+
+  /* ===== SIDEBAR ===== */
+  #sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 100;
+  }
+
+  .sidebar-logo {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-logo h1 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent2);
+    letter-spacing: 0.05em;
+  }
+  .sidebar-logo p {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 4px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .nav-section {
+    padding: 16px 12px 8px;
+  }
+  .nav-section-label {
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+    padding: 0 8px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text2);
+    transition: all 0.15s;
+    margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--bg3); color: var(--text); }
+  .nav-item.active { background: rgba(59,130,246,0.15); color: var(--accent2); }
+  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+  .sidebar-bottom {
+    margin-top: auto;
+    padding: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ===== MAIN CONTENT ===== */
+  #main {
+    margin-left: 220px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  .topbar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .topbar-title { font-size: 15px; font-weight: 500; }
+  .topbar-actions { display: flex; gap: 10px; }
+
+  .content {
+    padding: 28px;
+    flex: 1;
+  }
+
+  /* ===== COMPONENTS ===== */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { background: var(--border); }
+  .btn-danger { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+  .btn-danger:hover { background: rgba(239,68,68,0.25); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-warning { background: rgba(245,158,11,0.15); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+  .btn-warning:hover { background: rgba(245,158,11,0.25); }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .stat-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-value { font-size: 28px; font-weight: 700; margin-top: 8px; font-family: 'DM Mono', monospace; }
+  .stat-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    color: var(--text3);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+  }
+  td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .badge-blue { background: rgba(59,130,246,0.15); color: var(--accent2); }
+  .badge-green { background: rgba(34,197,94,0.15); color: var(--success); }
+  .badge-yellow { background: rgba(245,158,11,0.15); color: var(--warning); }
+  .badge-red { background: rgba(239,68,68,0.15); color: var(--danger); }
+  .badge-gray { background: rgba(100,116,139,0.15); color: var(--text3); }
+
+  /* ===== MODAL ===== */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 560px;
+    max-width: 95vw;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .modal-header h2 { font-size: 15px; font-weight: 600; }
+  .modal-body { padding: 24px; }
+  .modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+
+  /* ===== FORM ===== */
+  .form-group { margin-bottom: 16px; }
+  .form-label {
+    display: block;
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+  .form-label .required { color: var(--danger); margin-left: 3px; }
+  .form-input, .form-select, .form-textarea {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 9px 12px;
+    font-size: 13px;
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    transition: border-color 0.15s;
+    outline: none;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus {
+    border-color: var(--accent);
+  }
+  .form-textarea { resize: vertical; min-height: 80px; }
+  .form-select option { background: var(--bg3); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+  /* ===== ALERT ===== */
+  .alert {
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .alert-warning { background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); color: var(--warning); }
+  .alert-info { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); color: var(--accent2); }
+
+  /* ===== TABS ===== */
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .tab {
+    padding: 10px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--text3);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: all 0.15s;
+  }
+  .tab:hover { color: var(--text2); }
+  .tab.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+
+  /* ===== SEARCH ===== */
+  .search-box {
+    position: relative;
+    max-width: 280px;
+  }
+  .search-box input {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 12px 8px 34px;
+    font-size: 13px;
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    outline: none;
+  }
+  .search-box input:focus { border-color: var(--accent); }
+  .search-box .search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text3);
+    font-size: 14px;
+  }
+
+  /* ===== TOAST ===== */
+  #toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .toast {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    font-size: 13px;
+    min-width: 240px;
+    animation: slideIn 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .toast.success { border-left: 3px solid var(--success); }
+  .toast.error { border-left: 3px solid var(--danger); }
+  @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  /* ===== EMPTY STATE ===== */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text3);
+  }
+  .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; }
+
+  /* ===== LOADING ===== */
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    color: var(--text3);
+    font-size: 13px;
+    gap: 10px;
+  }
+  .spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .section-header h2 { font-size: 15px; font-weight: 600; }
+
+  /* ===== PAGE VIEWS ===== */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* ===== DETAIL PANEL ===== */
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .detail-item { }
+  .detail-label { font-size: 11px; color: var(--text3); margin-bottom: 3px; }
+  .detail-value { font-size: 13px; }
+
+  .expiry-near { color: var(--warning); }
+  .expiry-expired { color: var(--danger); }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<nav id="sidebar">
+  <div class="sidebar-logo">
+    <h1>派遣管理台帳</h1>
+    <p>KAKUZEN</p>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-label">メイン</div>
+    <div class="nav-item active" onclick="navigate('dashboard')">
+      <span class="icon">📊</span> ダッシュボード
+    </div>
+    <div class="nav-item" onclick="navigate('clients')">
+      <span class="icon">🏢</span> 派遣先企業
+    </div>
+    <div class="nav-item" onclick="navigate('sites')">
+      <span class="icon">📍</span> 現場管理
+    </div>
+    <div class="nav-item" onclick="navigate('assignments')">
+      <span class="icon">👥</span> スタッフ配属
+    </div>
+    <div class="nav-item" onclick="navigate('contracts')">
+      <span class="icon">📄</span> 契約管理
+    </div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-section-label">管理</div>
+    <div class="nav-item" onclick="navigate('billing')">
+      <span class="icon">💴</span> 請求管理
+    </div>
+    <div class="nav-item" onclick="navigate('settings')">
+      <span class="icon">⚙️</span> 設定
+    </div>
+  </div>
+
+  <div class="sidebar-bottom">
+    <div style="font-size:11px; color:var(--text3); font-family:'DM Mono',monospace;">v1.0.0</div>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<div id="main">
+  <div class="topbar">
+    <div class="topbar-title" id="page-title">ダッシュボード</div>
+    <div class="topbar-actions" id="topbar-actions"></div>
+  </div>
+
+  <div class="content">
+
+    <!-- ダッシュボード -->
+    <div class="page active" id="page-dashboard">
+      <div id="alerts-container"></div>
+      <div class="stat-grid" id="stat-grid">
+        <div class="stat-card"><div class="stat-label">派遣先企業</div><div class="stat-value" id="stat-clients">—</div></div>
+        <div class="stat-card"><div class="stat-label">現場数</div><div class="stat-value" id="stat-sites">—</div></div>
+        <div class="stat-card"><div class="stat-label">稼働中スタッフ</div><div class="stat-value" id="stat-active">—</div></div>
+        <div class="stat-card"><div class="stat-label">今月請求（予定）</div><div class="stat-value" id="stat-billing">—</div><div class="stat-sub">円</div></div>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <h2>⚠️ 契約期限アラート</h2>
+        </div>
+        <div id="expiry-list"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
+      </div>
+
+      <div class="card">
+        <div class="section-header">
+          <h2>最近の配属</h2>
+        </div>
+        <div id="recent-assignments"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
+      </div>
+    </div>
+
+    <!-- 派遣先企業 -->
+    <div class="page" id="page-clients">
+      <div class="section-header">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" placeholder="企業名で検索..." id="search-clients" oninput="filterClients()">
+        </div>
+      </div>
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div id="clients-table"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
+      </div>
+    </div>
+
+    <!-- 現場管理 -->
+    <div class="page" id="page-sites">
+      <div class="section-header">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" placeholder="現場名・企業名で検索..." id="search-sites" oninput="filterSites()">
+        </div>
+      </div>
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div id="sites-table"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
+      </div>
+    </div>
+
+    <!-- スタッフ配属 -->
+    <div class="page" id="page-assignments">
+      <div class="tabs">
+        <div class="tab active" onclick="switchAssignmentTab('active', this)">稼働中</div>
+        <div class="tab" onclick="switchAssignmentTab('client', this)">派遣先管理</div>
+        <div class="tab" onclick="switchAssignmentTab('all', this)">全員</div>
+      </div>
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div id="assignments-table"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
+      </div>
+    </div>
+
+    <!-- 契約管理 -->
+    <div class="page" id="page-contracts">
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div id="contracts-table"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
+      </div>
+    </div>
+
+    <!-- 請求管理 -->
+    <div class="page" id="page-billing">
+      <div class="section-header">
+        <div style="display:flex; gap:10px; align-items:center;">
+          <select class="form-select" id="billing-month-filter" onchange="loadBilling()" style="width:160px;">
+          </select>
+        </div>
+      </div>
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div id="billing-table"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
+      </div>
+    </div>
+
+    <!-- 設定 -->
+    <div class="page" id="page-settings">
+      <div class="card">
+        <h2 style="font-size:14px; margin-bottom:20px; font-weight:600;">自社情報</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">会社名<span class="required">*</span></label>
+            <input type="text" class="form-input" id="s-company-name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">代表者名</label>
+            <input type="text" class="form-input" id="s-representative">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">住所</label>
+          <input type="text" class="form-input" id="s-address">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">派遣業許可番号</label>
+            <input type="text" class="form-input" id="s-license" placeholder="派 XX-XXXXXX">
+          </div>
+          <div class="form-group">
+            <label class="form-label">事業所番号</label>
+            <input type="text" class="form-input" id="s-office-number">
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="saveSettings()">💾 保存</button>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<!-- ===== MODALS ===== -->
+
+<!-- 企業登録モーダル -->
+<div class="modal-overlay" id="modal-client">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-client-title">派遣先企業を登録</h2>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-client')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="client-id">
+      <div class="form-group">
+        <label class="form-label">企業名<span class="required">*</span></label>
+        <input type="text" class="form-input" id="client-name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">住所</label>
+        <input type="text" class="form-input" id="client-address">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">担当者名</label>
+          <input type="text" class="form-input" id="client-contact-person">
+        </div>
+        <div class="form-group">
+          <label class="form-label">電話番号</label>
+          <input type="text" class="form-input" id="client-contact-phone">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">メールアドレス</label>
+        <input type="email" class="form-input" id="client-contact-email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">備考</label>
+        <textarea class="form-textarea" id="client-notes"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-client')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveClient()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 現場登録モーダル -->
+<div class="modal-overlay" id="modal-site">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-site-title">現場を登録</h2>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-site')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="site-id">
+      <div class="form-group">
+        <label class="form-label">派遣先企業<span class="required">*</span></label>
+        <select class="form-select" id="site-client-id"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">現場名<span class="required">*</span></label>
+        <input type="text" class="form-input" id="site-name">
+      </div>
+      <div class="form-group">
+        <label class="form-label">現場住所</label>
+        <input type="text" class="form-input" id="site-address">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">担当者</label>
+          <input type="text" class="form-input" id="site-contact-person">
+        </div>
+        <div class="form-group">
+          <label class="form-label">指揮命令者</label>
+          <input type="text" class="form-input" id="site-supervisor">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">職種</label>
+          <input type="text" class="form-input" id="site-job-type">
+        </div>
+        <div class="form-group">
+          <label class="form-label">就業条件</label>
+          <input type="text" class="form-input" id="site-work-conditions" placeholder="例: 9:00〜18:00">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">契約開始日</label>
+          <input type="date" class="form-input" id="site-contract-start">
+        </div>
+        <div class="form-group">
+          <label class="form-label">契約終了日</label>
+          <input type="date" class="form-input" id="site-contract-end">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">備考</label>
+        <textarea class="form-textarea" id="site-notes"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-site')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveSite()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 配属登録モーダル -->
+<div class="modal-overlay" id="modal-assignment">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-assignment-title">スタッフを配属</h2>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-assignment')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="assignment-id">
+      <div class="alert alert-info">
+        ℹ️ スタッフIDは従業員管理台帳のIDを入力してください
+      </div>
+      <div class="form-group">
+        <label class="form-label">スタッフID（従業員台帳）<span class="required">*</span></label>
+        <input type="text" class="form-input" id="assignment-employee-id" placeholder="UUID">
+      </div>
+      <div class="form-group">
+        <label class="form-label">スタッフ名（参考表示用）</label>
+        <input type="text" class="form-input" id="assignment-employee-name" placeholder="表示用の名前">
+      </div>
+      <div class="form-group">
+        <label class="form-label">配属現場<span class="required">*</span></label>
+        <select class="form-select" id="assignment-site-id"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">管理区分<span class="required">*</span></label>
+        <select class="form-select" id="assignment-management-type">
+          <option value="self">自社管理</option>
+          <option value="client">派遣先システム管理</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">配属開始日<span class="required">*</span></label>
+          <input type="date" class="form-input" id="assignment-start-date">
+        </div>
+        <div class="form-group">
+          <label class="form-label">配属終了日</label>
+          <input type="date" class="form-input" id="assignment-end-date">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">備考</label>
+        <textarea class="form-textarea" id="assignment-notes"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-assignment')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveAssignment()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 契約登録モーダル -->
+<div class="modal-overlay" id="modal-contract">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-contract-title">契約を登録</h2>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-contract')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="contract-id">
+      <input type="hidden" id="contract-parent-id">
+      <div class="form-group">
+        <label class="form-label">現場<span class="required">*</span></label>
+        <select class="form-select" id="contract-site-id"></select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">契約開始日<span class="required">*</span></label>
+          <input type="date" class="form-input" id="contract-start">
+        </div>
+        <div class="form-group">
+          <label class="form-label">契約終了日<span class="required">*</span></label>
+          <input type="date" class="form-input" id="contract-end">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">派遣人員数</label>
+          <input type="number" class="form-input" id="contract-dispatch-count" value="1" min="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">更新回数</label>
+          <input type="number" class="form-input" id="contract-renewal-count" value="0" min="0">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-contract')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveContract()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 請求登録モーダル -->
+<div class="modal-overlay" id="modal-billing">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-billing-title">請求を記録</h2>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-billing')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="billing-id">
+      <div class="form-group">
+        <label class="form-label">派遣先企業<span class="required">*</span></label>
+        <select class="form-select" id="billing-client-id"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">対象年月<span class="required">*</span></label>
+        <input type="month" class="form-input" id="billing-month">
+      </div>
+      <div class="form-group">
+        <label class="form-label">金額（円）<span class="required">*</span></label>
+        <input type="number" class="form-input" id="billing-amount" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">請求済み</label>
+        <select class="form-select" id="billing-is-billed">
+          <option value="false">未請求</option>
+          <option value="true">請求済み</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">備考</label>
+        <textarea class="form-textarea" id="billing-notes"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-billing')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveBilling()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<script>
+// ===== SUPABASE INIT =====
+const SUPABASE_URL = 'https://wkzbsdfgslidubqpifwa.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_mfVmygJgUjnax83quON02Q_KMdYfF-Y';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ===== STATE =====
+let state = {
+  clients: [],
+  sites: [],
+  assignments: [],
+  contracts: [],
+  billing: [],
+  currentPage: 'dashboard',
+  assignmentTab: 'active',
+};
+
+// ===== NAVIGATION =====
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.textContent.trim().includes(getPageLabel(page))) n.classList.add('active');
+  });
+  state.currentPage = page;
+
+  const titles = {
+    dashboard: 'ダッシュボード',
+    clients: '派遣先企業',
+    sites: '現場管理',
+    assignments: 'スタッフ配属',
+    contracts: '契約管理',
+    billing: '請求管理',
+    settings: '設定',
+  };
+  document.getElementById('page-title').textContent = titles[page] || page;
+
+  const actions = {
+    clients: `<button class="btn btn-primary" onclick="openClientModal()">＋ 企業を登録</button>`,
+    sites: `<button class="btn btn-primary" onclick="openSiteModal()">＋ 現場を登録</button>`,
+    assignments: `<button class="btn btn-primary" onclick="openAssignmentModal()">＋ 配属を登録</button>`,
+    contracts: `<button class="btn btn-primary" onclick="openContractModal()">＋ 契約を登録</button>`,
+    billing: `<button class="btn btn-primary" onclick="openBillingModal()">＋ 請求を記録</button>`,
+  };
+  document.getElementById('topbar-actions').innerHTML = actions[page] || '';
+
+  loadPage(page);
+}
+
+function getPageLabel(page) {
+  const m = { dashboard: 'ダッシュボード', clients: '派遣先企業', sites: '現場管理', assignments: 'スタッフ配属', contracts: '契約管理', billing: '請求管理', settings: '設定' };
+  return m[page] || '';
+}
+
+// ===== LOAD =====
+async function loadPage(page) {
+  if (page === 'dashboard') await loadDashboard();
+  else if (page === 'clients') await loadClients();
+  else if (page === 'sites') await loadSites();
+  else if (page === 'assignments') await loadAssignments();
+  else if (page === 'contracts') await loadContracts();
+  else if (page === 'billing') { initBillingMonths(); await loadBilling(); }
+  else if (page === 'settings') await loadSettings();
+}
+
+// ===== DASHBOARD =====
+async function loadDashboard() {
+  const [c, s, a, b, ct] = await Promise.all([
+    db.from('clients').select('id'),
+    db.from('sites').select('id'),
+    db.from('assignments').select('id').eq('is_active', true),
+    db.from('billing').select('amount').gte('billing_month', firstOfMonth()),
+    db.from('contracts').select('*').gte('contract_end', today()).lte('contract_end', daysFromNow(60)),
+  ]);
+
+  document.getElementById('stat-clients').textContent = (c.data||[]).length;
+  document.getElementById('stat-sites').textContent = (s.data||[]).length;
+  document.getElementById('stat-active').textContent = (a.data||[]).length;
+  const total = (b.data||[]).reduce((sum, r) => sum + (r.amount||0), 0);
+  document.getElementById('stat-billing').textContent = total.toLocaleString('ja-JP');
+
+  // Expiry alerts
+  const contracts = ct.data || [];
+  const alertsEl = document.getElementById('expiry-list');
+  if (contracts.length === 0) {
+    alertsEl.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>期限が近い契約はありません</p></div>';
+  } else {
+    const sitesRes = await db.from('sites').select('id, name, clients(name)');
+    const sitesMap = {};
+    (sitesRes.data||[]).forEach(s => sitesMap[s.id] = s);
+
+    alertsEl.innerHTML = `<table>
+      <thead><tr><th>現場</th><th>企業</th><th>契約終了日</th><th>残り日数</th><th>操作</th></tr></thead>
+      <tbody>${contracts.map(c => {
+        const site = sitesMap[c.site_id];
+        const days = Math.ceil((new Date(c.contract_end) - new Date()) / 86400000);
+        const cls = days <= 14 ? 'expiry-expired' : 'expiry-near';
+        return `<tr>
+          <td>${site?.name || '—'}</td>
+          <td>${site?.clients?.name || '—'}</td>
+          <td class="${cls}">${c.contract_end}</td>
+          <td class="${cls}">${days}日</td>
+          <td><button class="btn btn-warning btn-sm" onclick="openRenewalModal('${c.id}')">🔄 更新</button></td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  }
+
+  // Recent assignments
+  const ra = await db.from('assignments').select('*, sites(name, clients(name))').eq('is_active', true).order('created_at', {ascending: false}).limit(5);
+  const raEl = document.getElementById('recent-assignments');
+  if ((ra.data||[]).length === 0) {
+    raEl.innerHTML = '<div class="empty-state"><div class="icon">👥</div><p>配属中のスタッフがいません</p></div>';
+  } else {
+    raEl.innerHTML = `<table>
+      <thead><tr><th>スタッフID（略）</th><th>現場</th><th>企業</th><th>管理区分</th><th>開始日</th></tr></thead>
+      <tbody>${(ra.data||[]).map(a => `<tr>
+        <td style="font-family:'DM Mono',monospace; font-size:11px;">${a.employee_id.substring(0,8)}...</td>
+        <td>${a.sites?.name || '—'}</td>
+        <td>${a.sites?.clients?.name || '—'}</td>
+        <td>${a.management_type === 'self' ? '<span class="badge badge-blue">自社管理</span>' : '<span class="badge badge-gray">派遣先管理</span>'}</td>
+        <td>${a.start_date}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  }
+}
+
+// ===== CLIENTS =====
+async function loadClients() {
+  const { data, error } = await db.from('clients').select('*').order('name');
+  state.clients = data || [];
+  renderClients(state.clients);
+}
+
+function renderClients(clients) {
+  const el = document.getElementById('clients-table');
+  if (clients.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">🏢</div><p>企業が登録されていません</p></div>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>企業名</th><th>担当者</th><th>電話番号</th><th>メール</th><th>操作</th></tr></thead>
+    <tbody>${clients.map(c => `<tr>
+      <td><strong>${c.name}</strong></td>
+      <td>${c.contact_person || '—'}</td>
+      <td>${c.contact_phone || '—'}</td>
+      <td>${c.contact_email || '—'}</td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn btn-secondary btn-sm" onclick="openClientModal(${JSON.stringify(c).replace(/"/g, '&quot;')})">編集</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteClient('${c.id}')">削除</button>
+      </td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function filterClients() {
+  const q = document.getElementById('search-clients').value.toLowerCase();
+  renderClients(state.clients.filter(c => c.name.toLowerCase().includes(q)));
+}
+
+// ===== SITES =====
+async function loadSites() {
+  const { data } = await db.from('sites').select('*, clients(name)').order('name');
+  state.sites = data || [];
+  renderSites(state.sites);
+}
+
+function renderSites(sites) {
+  const el = document.getElementById('sites-table');
+  if (sites.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">📍</div><p>現場が登録されていません</p></div>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>現場名</th><th>企業</th><th>職種</th><th>指揮命令者</th><th>契約期間</th><th>操作</th></tr></thead>
+    <tbody>${sites.map(s => {
+      const end = s.contract_end;
+      const days = end ? Math.ceil((new Date(end) - new Date()) / 86400000) : null;
+      const endCls = days !== null ? (days < 0 ? 'expiry-expired' : days < 30 ? 'expiry-near' : '') : '';
+      return `<tr>
+        <td><strong>${s.name}</strong></td>
+        <td>${s.clients?.name || '—'}</td>
+        <td>${s.job_type || '—'}</td>
+        <td>${s.supervisor || '—'}</td>
+        <td class="${endCls}">${s.contract_start || '—'} 〜 ${s.contract_end || '—'}</td>
+        <td style="display:flex;gap:6px;">
+          <button class="btn btn-secondary btn-sm" onclick="openSiteModal(${JSON.stringify(s).replace(/"/g, '&quot;')})">編集</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSite('${s.id}')">削除</button>
+        </td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+function filterSites() {
+  const q = document.getElementById('search-sites').value.toLowerCase();
+  renderSites(state.sites.filter(s => s.name.toLowerCase().includes(q) || (s.clients?.name || '').toLowerCase().includes(q)));
+}
+
+// ===== ASSIGNMENTS =====
+async function loadAssignments() {
+  const { data } = await db.from('assignments').select('*, sites(name, clients(name))').order('created_at', {ascending: false});
+  state.assignments = data || [];
+  renderAssignments();
+}
+
+function switchAssignmentTab(tab, el) {
+  state.assignmentTab = tab;
+  document.querySelectorAll('#page-assignments .tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderAssignments();
+}
+
+function renderAssignments() {
+  let list = state.assignments;
+  if (state.assignmentTab === 'active') list = list.filter(a => a.is_active && a.management_type === 'self');
+  else if (state.assignmentTab === 'client') list = list.filter(a => a.management_type === 'client');
+
+  const el = document.getElementById('assignments-table');
+  if (list.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">👥</div><p>該当するスタッフがいません</p></div>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>スタッフID</th><th>現場</th><th>企業</th><th>管理区分</th><th>開始日</th><th>終了日</th><th>状態</th><th>操作</th></tr></thead>
+    <tbody>${list.map(a => `<tr>
+      <td style="font-family:'DM Mono',monospace; font-size:11px;">${a.employee_id.substring(0,12)}...</td>
+      <td>${a.sites?.name || '—'}</td>
+      <td>${a.sites?.clients?.name || '—'}</td>
+      <td>${a.management_type === 'self' ? '<span class="badge badge-blue">自社管理</span>' : '<span class="badge badge-gray">派遣先管理</span>'}</td>
+      <td>${a.start_date}</td>
+      <td>${a.end_date || '—'}</td>
+      <td>${a.is_active ? '<span class="badge badge-green">稼働中</span>' : '<span class="badge badge-gray">終了</span>'}</td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn btn-secondary btn-sm" onclick="openAssignmentModal(${JSON.stringify(a).replace(/"/g, '&quot;')})">編集</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteAssignment('${a.id}')">削除</button>
+      </td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+// ===== CONTRACTS =====
+async function loadContracts() {
+  const { data } = await db.from('contracts').select('*, sites(name, clients(name))').order('contract_end', {ascending: true});
+  state.contracts = data || [];
+  const el = document.getElementById('contracts-table');
+  if (state.contracts.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">📄</div><p>契約が登録されていません</p></div>';
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>現場</th><th>企業</th><th>開始日</th><th>終了日</th><th>人員</th><th>更新回数</th><th>状態</th><th>操作</th></tr></thead>
+    <tbody>${state.contracts.map(c => {
+      const days = Math.ceil((new Date(c.contract_end) - new Date()) / 86400000);
+      const status = days < 0 ? '<span class="badge badge-red">期限切れ</span>'
+        : days < 30 ? '<span class="badge badge-yellow">期限間近</span>'
+        : '<span class="badge badge-green">有効</span>';
+      return `<tr>
+        <td><strong>${c.sites?.name || '—'}</strong></td>
+        <td>${c.sites?.clients?.name || '—'}</td>
+        <td>${c.contract_start}</td>
+        <td>${c.contract_end}</td>
+        <td>${c.dispatch_count}名</td>
+        <td>${c.renewal_count}回</td>
+        <td>${status}</td>
+        <td style="display:flex;gap:6px;">
+          <button class="btn btn-warning btn-sm" onclick="openRenewalModal('${c.id}')">🔄 更新</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteContract('${c.id}')">削除</button>
+        </td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+}
+
+// ===== BILLING =====
+function initBillingMonths() {
+  const sel = document.getElementById('billing-month-filter');
+  sel.innerHTML = '';
+  const now = new Date();
+  for (let i = -2; i <= 3; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label = `${d.getFullYear()}年${d.getMonth()+1}月`;
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = label;
+    if (i === 0) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+async function loadBilling() {
+  const month = document.getElementById('billing-month-filter').value;
+  const start = month + '-01';
+  const end = month + '-31';
+  const { data } = await db.from('billing').select('*, clients(name)').gte('billing_month', start).lte('billing_month', end).order('created_at');
+  state.billing = data || [];
+  const el = document.getElementById('billing-table');
+  if (state.billing.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="icon">💴</div><p>この月の請求がありません</p></div>';
+    return;
+  }
+  const total = state.billing.reduce((s, b) => s + (b.amount||0), 0);
+  el.innerHTML = `<table>
+    <thead><tr><th>派遣先企業</th><th>対象月</th><th>金額</th><th>状態</th><th>備考</th><th>操作</th></tr></thead>
+    <tbody>${state.billing.map(b => `<tr>
+      <td><strong>${b.clients?.name || '—'}</strong></td>
+      <td>${b.billing_month?.substring(0,7)}</td>
+      <td style="font-family:'DM Mono',monospace;">${(b.amount||0).toLocaleString('ja-JP')}円</td>
+      <td>${b.is_billed ? '<span class="badge badge-green">請求済み</span>' : '<span class="badge badge-yellow">未請求</span>'}</td>
+      <td>${b.notes || '—'}</td>
+      <td style="display:flex;gap:6px;">
+        <button class="btn btn-secondary btn-sm" onclick="openBillingModal(${JSON.stringify(b).replace(/"/g, '&quot;')})">編集</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteBilling('${b.id}')">削除</button>
+      </td>
+    </tr>`).join('')}
+    <tr style="background:rgba(59,130,246,0.05);">
+      <td colspan="2"><strong>合計</strong></td>
+      <td colspan="4" style="font-family:'DM Mono',monospace; font-weight:700; color:var(--accent2);">${total.toLocaleString('ja-JP')}円</td>
+    </tr>
+    </tbody>
+  </table>`;
+}
+
+// ===== SETTINGS =====
+async function loadSettings() {
+  const { data } = await db.from('settings').select('*').limit(1).maybeSingle();
+  if (data) {
+    document.getElementById('s-company-name').value = data.company_name || '';
+    document.getElementById('s-representative').value = data.representative || '';
+    document.getElementById('s-address').value = data.company_address || '';
+    document.getElementById('s-license').value = data.license_number || '';
+    document.getElementById('s-office-number').value = data.office_number || '';
+  }
+}
+
+async function saveSettings() {
+  const payload = {
+    company_name: document.getElementById('s-company-name').value,
+    representative: document.getElementById('s-representative').value,
+    company_address: document.getElementById('s-address').value,
+    license_number: document.getElementById('s-license').value,
+    office_number: document.getElementById('s-office-number').value,
+    updated_at: new Date().toISOString(),
+  };
+  const { data: existing } = await db.from('settings').select('id').limit(1).maybeSingle();
+  let error;
+  if (existing) {
+    ({ error } = await db.from('settings').update(payload).eq('id', existing.id));
+  } else {
+    ({ error } = await db.from('settings').insert(payload));
+  }
+  if (error) toast('保存に失敗しました', 'error');
+  else toast('自社情報を保存しました', 'success');
+}
+
+// ===== MODAL HELPERS =====
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// CLIENT MODAL
+function openClientModal(client) {
+  document.getElementById('modal-client-title').textContent = client ? '企業を編集' : '派遣先企業を登録';
+  document.getElementById('client-id').value = client?.id || '';
+  document.getElementById('client-name').value = client?.name || '';
+  document.getElementById('client-address').value = client?.address || '';
+  document.getElementById('client-contact-person').value = client?.contact_person || '';
+  document.getElementById('client-contact-phone').value = client?.contact_phone || '';
+  document.getElementById('client-contact-email').value = client?.contact_email || '';
+  document.getElementById('client-notes').value = client?.notes || '';
+  openModal('modal-client');
+}
+
+async function saveClient() {
+  const id = document.getElementById('client-id').value;
+  const payload = {
+    name: document.getElementById('client-name').value,
+    address: document.getElementById('client-address').value,
+    contact_person: document.getElementById('client-contact-person').value,
+    contact_phone: document.getElementById('client-contact-phone').value,
+    contact_email: document.getElementById('client-contact-email').value,
+    notes: document.getElementById('client-notes').value,
+    updated_at: new Date().toISOString(),
+  };
+  if (!payload.name) { toast('企業名を入力してください', 'error'); return; }
+  const { error } = id ? await db.from('clients').update(payload).eq('id', id) : await db.from('clients').insert(payload);
+  if (error) { toast('保存に失敗しました', 'error'); return; }
+  toast(id ? '企業を更新しました' : '企業を登録しました', 'success');
+  closeModal('modal-client');
+  loadClients();
+}
+
+async function deleteClient(id) {
+  if (!confirm('この企業を削除しますか？')) return;
+  const { error } = await db.from('clients').delete().eq('id', id);
+  if (error) toast('削除に失敗しました', 'error');
+  else { toast('削除しました', 'success'); loadClients(); }
+}
+
+// SITE MODAL
+async function openSiteModal(site) {
+  document.getElementById('modal-site-title').textContent = site ? '現場を編集' : '現場を登録';
+  document.getElementById('site-id').value = site?.id || '';
+  document.getElementById('site-name').value = site?.name || '';
+  document.getElementById('site-address').value = site?.address || '';
+  document.getElementById('site-contact-person').value = site?.contact_person || '';
+  document.getElementById('site-supervisor').value = site?.supervisor || '';
+  document.getElementById('site-job-type').value = site?.job_type || '';
+  document.getElementById('site-work-conditions').value = site?.work_conditions || '';
+  document.getElementById('site-contract-start').value = site?.contract_start || '';
+  document.getElementById('site-contract-end').value = site?.contract_end || '';
+  document.getElementById('site-notes').value = site?.notes || '';
+
+  const { data: clients } = await db.from('clients').select('id, name').order('name');
+  const sel = document.getElementById('site-client-id');
+  sel.innerHTML = clients.map(c => `<option value="${c.id}" ${c.id === site?.client_id ? 'selected' : ''}>${c.name}</option>`).join('');
+  openModal('modal-site');
+}
+
+async function saveSite() {
+  const id = document.getElementById('site-id').value;
+  const payload = {
+    client_id: document.getElementById('site-client-id').value,
+    name: document.getElementById('site-name').value,
+    address: document.getElementById('site-address').value,
+    contact_person: document.getElementById('site-contact-person').value,
+    supervisor: document.getElementById('site-supervisor').value,
+    job_type: document.getElementById('site-job-type').value,
+    work_conditions: document.getElementById('site-work-conditions').value,
+    contract_start: document.getElementById('site-contract-start').value || null,
+    contract_end: document.getElementById('site-contract-end').value || null,
+    notes: document.getElementById('site-notes').value,
+    updated_at: new Date().toISOString(),
+  };
+  if (!payload.name || !payload.client_id) { toast('必須項目を入力してください', 'error'); return; }
+  const { error } = id ? await db.from('sites').update(payload).eq('id', id) : await db.from('sites').insert(payload);
+  if (error) { toast('保存に失敗しました', 'error'); return; }
+  toast(id ? '現場を更新しました' : '現場を登録しました', 'success');
+  closeModal('modal-site');
+  loadSites();
+}
+
+async function deleteSite(id) {
+  if (!confirm('この現場を削除しますか？')) return;
+  const { error } = await db.from('sites').delete().eq('id', id);
+  if (error) toast('削除に失敗しました', 'error');
+  else { toast('削除しました', 'success'); loadSites(); }
+}
+
+// ASSIGNMENT MODAL
+async function openAssignmentModal(a) {
+  document.getElementById('modal-assignment-title').textContent = a ? '配属を編集' : 'スタッフを配属';
+  document.getElementById('assignment-id').value = a?.id || '';
+  document.getElementById('assignment-employee-id').value = a?.employee_id || '';
+  document.getElementById('assignment-employee-name').value = a?.notes || '';
+  document.getElementById('assignment-start-date').value = a?.start_date || '';
+  document.getElementById('assignment-end-date').value = a?.end_date || '';
+  document.getElementById('assignment-management-type').value = a?.management_type || 'self';
+  document.getElementById('assignment-notes').value = a?.notes || '';
+
+  const { data: sites } = await db.from('sites').select('id, name, clients(name)').order('name');
+  const sel = document.getElementById('assignment-site-id');
+  sel.innerHTML = sites.map(s => `<option value="${s.id}" ${s.id === a?.site_id ? 'selected' : ''}>${s.name}（${s.clients?.name || ''}）</option>`).join('');
+  openModal('modal-assignment');
+}
+
+async function saveAssignment() {
+  const id = document.getElementById('assignment-id').value;
+  const payload = {
+    employee_id: document.getElementById('assignment-employee-id').value,
+    site_id: document.getElementById('assignment-site-id').value,
+    management_type: document.getElementById('assignment-management-type').value,
+    start_date: document.getElementById('assignment-start-date').value,
+    end_date: document.getElementById('assignment-end-date').value || null,
+    notes: document.getElementById('assignment-notes').value,
+    is_active: true,
+    updated_at: new Date().toISOString(),
+  };
+  if (!payload.employee_id || !payload.site_id || !payload.start_date) { toast('必須項目を入力してください', 'error'); return; }
+  const { error } = id ? await db.from('assignments').update(payload).eq('id', id) : await db.from('assignments').insert(payload);
+  if (error) { toast('保存に失敗しました', 'error'); return; }
+  toast(id ? '配属を更新しました' : '配属を登録しました', 'success');
+  closeModal('modal-assignment');
+  loadAssignments();
+}
+
+async function deleteAssignment(id) {
+  if (!confirm('この配属を削除しますか？')) return;
+  const { error } = await db.from('assignments').delete().eq('id', id);
+  if (error) toast('削除に失敗しました', 'error');
+  else { toast('削除しました', 'success'); loadAssignments(); }
+}
+
+// CONTRACT MODAL
+async function openContractModal(c) {
+  document.getElementById('modal-contract-title').textContent = c ? '契約を編集' : '契約を登録';
+  document.getElementById('contract-id').value = c?.id || '';
+  document.getElementById('contract-parent-id').value = '';
+  document.getElementById('contract-start').value = c?.contract_start || '';
+  document.getElementById('contract-end').value = c?.contract_end || '';
+  document.getElementById('contract-dispatch-count').value = c?.dispatch_count || 1;
+  document.getElementById('contract-renewal-count').value = c?.renewal_count || 0;
+
+  const { data: sites } = await db.from('sites').select('id, name, clients(name)').order('name');
+  const sel = document.getElementById('contract-site-id');
+  sel.innerHTML = sites.map(s => `<option value="${s.id}" ${s.id === c?.site_id ? 'selected' : ''}>${s.name}（${s.clients?.name || ''}）</option>`).join('');
+  openModal('modal-contract');
+}
+
+async function openRenewalModal(contractId) {
+  const { data: c } = await db.from('contracts').select('*').eq('id', contractId).single();
+  document.getElementById('modal-contract-title').textContent = '契約を更新';
+  document.getElementById('contract-id').value = '';
+  document.getElementById('contract-parent-id').value = c.id;
+  document.getElementById('contract-start').value = c.contract_end;
+  document.getElementById('contract-end').value = '';
+  document.getElementById('contract-dispatch-count').value = c.dispatch_count;
+  document.getElementById('contract-renewal-count').value = (c.renewal_count || 0) + 1;
+
+  const { data: sites } = await db.from('sites').select('id, name, clients(name)').order('name');
+  const sel = document.getElementById('contract-site-id');
+  sel.innerHTML = sites.map(s => `<option value="${s.id}" ${s.id === c.site_id ? 'selected' : ''}>${s.name}（${s.clients?.name || ''}）</option>`).join('');
+  openModal('modal-contract');
+}
+
+async function saveContract() {
+  const id = document.getElementById('contract-id').value;
+  const parentId = document.getElementById('contract-parent-id').value;
+  const payload = {
+    site_id: document.getElementById('contract-site-id').value,
+    contract_start: document.getElementById('contract-start').value,
+    contract_end: document.getElementById('contract-end').value,
+    dispatch_count: parseInt(document.getElementById('contract-dispatch-count').value) || 1,
+    renewal_count: parseInt(document.getElementById('contract-renewal-count').value) || 0,
+    parent_contract_id: parentId || null,
+    updated_at: new Date().toISOString(),
+  };
+  if (!payload.site_id || !payload.contract_start || !payload.contract_end) { toast('必須項目を入力してください', 'error'); return; }
+  const { error } = id ? await db.from('contracts').update(payload).eq('id', id) : await db.from('contracts').insert(payload);
+  if (error) { toast('保存に失敗しました', 'error'); return; }
+  toast(id ? '契約を更新しました' : (parentId ? '契約を更新登録しました' : '契約を登録しました'), 'success');
+  closeModal('modal-contract');
+  if (state.currentPage === 'contracts') loadContracts();
+  else loadDashboard();
+}
+
+async function deleteContract(id) {
+  if (!confirm('この契約を削除しますか？')) return;
+  const { error } = await db.from('contracts').delete().eq('id', id);
+  if (error) toast('削除に失敗しました', 'error');
+  else { toast('削除しました', 'success'); loadContracts(); }
+}
+
+// BILLING MODAL
+async function openBillingModal(b) {
+  document.getElementById('modal-billing-title').textContent = b ? '請求を編集' : '請求を記録';
+  document.getElementById('billing-id').value = b?.id || '';
+  document.getElementById('billing-amount').value = b?.amount || '';
+  document.getElementById('billing-is-billed').value = b?.is_billed ? 'true' : 'false';
+  document.getElementById('billing-notes').value = b?.notes || '';
+
+  if (b?.billing_month) {
+    document.getElementById('billing-month').value = b.billing_month.substring(0,7);
+  } else {
+    const now = new Date();
+    document.getElementById('billing-month').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  }
+
+  const { data: clients } = await db.from('clients').select('id, name').order('name');
+  const sel = document.getElementById('billing-client-id');
+  sel.innerHTML = clients.map(c => `<option value="${c.id}" ${c.id === b?.client_id ? 'selected' : ''}>${c.name}</option>`).join('');
+  openModal('modal-billing');
+}
+
+async function saveBilling() {
+  const id = document.getElementById('billing-id').value;
+  const month = document.getElementById('billing-month').value;
+  const payload = {
+    client_id: document.getElementById('billing-client-id').value,
+    billing_month: month + '-01',
+    amount: parseInt(document.getElementById('billing-amount').value) || 0,
+    is_billed: document.getElementById('billing-is-billed').value === 'true',
+    notes: document.getElementById('billing-notes').value,
+    updated_at: new Date().toISOString(),
+  };
+  if (!payload.client_id || !payload.billing_month) { toast('必須項目を入力してください', 'error'); return; }
+  const { error } = id ? await db.from('billing').update(payload).eq('id', id) : await db.from('billing').insert(payload);
+  if (error) { toast('保存に失敗しました', 'error'); return; }
+  toast(id ? '請求を更新しました' : '請求を記録しました', 'success');
+  closeModal('modal-billing');
+  loadBilling();
+}
+
+async function deleteBilling(id) {
+  if (!confirm('この請求を削除しますか？')) return;
+  const { error } = await db.from('billing').delete().eq('id', id);
+  if (error) toast('削除に失敗しました', 'error');
+  else { toast('削除しました', 'success'); loadBilling(); }
+}
+
+// ===== UTILITIES =====
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `${type === 'success' ? '✅' : '❌'} ${msg}`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+function today() { return new Date().toISOString().split('T')[0]; }
+function firstOfMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+}
+function daysFromNow(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+}
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+
+// ===== INIT =====
+loadDashboard();
+</script>
+</body>
+</html>
