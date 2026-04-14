@@ -439,6 +439,23 @@ tr:hover td{background:rgba(255,255,255,.02);}
         <div class="form-group"><label class="form-label">就業場所の電話番号</label><input type="text" class="form-input" id="s-work-tel" placeholder="例：0564-00-0000"></div>
       </div>
       <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">無期雇用・60歳以上に限定するか否か</label>
+          <select class="form-select" id="s-mukirogen">
+            <option value="none">限定なし</option>
+            <option value="mukirogen">無期雇用派遣労働者に限定</option>
+            <option value="over60">60歳以上の者に限定</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">協定対象派遣労働者に限定するか否か</label>
+          <select class="form-select" id="s-kyotei">
+            <option value="yes">協定対象派遣労働者に限定</option>
+            <option value="no">限定なし</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
         <div class="form-group"><label class="form-label">職種</label><input type="text" class="form-input" id="s-job-type"></div>
         <div class="form-group"></div>
       </div>
@@ -558,6 +575,10 @@ tr:hover td{background:rgba(255,255,255,.02);}
       <div class="form-row">
         <div class="form-group"><label class="form-label">契約開始日<span class="required">*</span></label><input type="date" class="form-input" id="ct-start"></div>
         <div class="form-group"><label class="form-label">契約終了日<span class="required">*</span></label><input type="date" class="form-input" id="ct-end"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">締結日</label><input type="date" class="form-input" id="ct-contract-date"></div>
+        <div class="form-group"></div>
       </div>
 
       <div class="form-row">
@@ -901,6 +922,8 @@ async function openSiteModal(site){
     's-notes-site':'notes',
   };
   Object.entries(fields).forEach(([elId,key])=>{ document.getElementById(elId).value=site?.[key]||''; });
+  document.getElementById('s-mukirogen').value=site?.mukirogen||'none';
+  document.getElementById('s-kyotei').value=site?.kyotei||'yes';
   // 安全衛生・福祉：既存データがあればそれを表示、なければデフォルト文言
   document.getElementById('s-safety').value = site?.safety_content || DEFAULT_SAFETY;
   document.getElementById('s-welfare').value = site?.welfare_content || DEFAULT_WELFARE;
@@ -935,6 +958,8 @@ async function saveSite(){
     address:document.getElementById('s-address-site').value,
     work_dept:document.getElementById('s-work-dept').value,
     work_tel:document.getElementById('s-work-tel').value,
+    mukirogen:document.getElementById('s-mukirogen').value,
+    kyotei:document.getElementById('s-kyotei').value,
     supervisor:document.getElementById('s-supervisor').value,
     cmd_dept:document.getElementById('s-cmd-dept').value,
     cmd_title:document.getElementById('s-cmd-title').value,
@@ -1135,6 +1160,7 @@ async function openContractModal(cid){
   document.getElementById('ct-no').value=existing?.contract_no||(await generateContractNo());
   document.getElementById('ct-start').value=existing?.contract_start||'';
   document.getElementById('ct-end').value=existing?.contract_end||'';
+  document.getElementById('ct-contract-date').value=existing?.contract_date||'';
   document.getElementById('ct-ryokin').value=existing?.haken_ryokin||'';
   document.getElementById('ct-ryokin-tani').value=existing?.ryokin_tani||'';
   document.getElementById('ct-notes').value=existing?.notes||'';
@@ -1178,6 +1204,7 @@ async function saveContract(){
     contract_no:document.getElementById('ct-no').value,
     contract_start:document.getElementById('ct-start').value,
     contract_end:document.getElementById('ct-end').value,
+    contract_date:document.getElementById('ct-contract-date').value||null,
     haken_ryokin:document.getElementById('ct-ryokin').value,
     ryokin_tani:document.getElementById('ct-ryokin-tani').value,
     jissai_shokuchoku_date:site?.jissai_shokuchoku_date||null,
@@ -1268,8 +1295,13 @@ async function syncDispatchContracts(contractId, startDate, endDate, contractNo)
 
 // ===== DOCS MODAL =====
 async function openDocsModal(cid){
-  const {data:c}=await db.from('contracts').select('*,sites(*,clients(*),work_patterns(*)),contract_employees(*)').eq('id',cid).single();
+  const {data:c}=await db.from('contracts').select('*,sites(*,clients(*)),contract_employees(*)').eq('id',cid).single();
   if(!c)return;
+  // work_patternsを別途取得
+  if(c.sites?.id){
+    const {data:wp}=await db.from('work_patterns').select('*').eq('site_id',c.sites.id).order('created_at').limit(1);
+    c.sites.work_patterns=wp||[];
+  }
   currentDocContract=c;
   const empIds=(c.contract_employees||[]).map(e=>e.employee_id);
   let empData={};
@@ -1305,6 +1337,18 @@ async function getSettingsData(){
 
 function v(val,def=''){return val||def;}  // value or default
 
+function toWareki(dateStr){
+  if(!dateStr)return '';
+  const d=new Date(dateStr);
+  if(isNaN(d))return dateStr;
+  const y=d.getFullYear(),m=d.getMonth()+1,day=d.getDate();
+  let era,year;
+  if(y>=2019||(y===2019&&m>=5)){era='令和';year=y-2018;}
+  else if(y>=1989||(y===1989&&m>=1&&day>=8)){era='平成';year=y-1988;}
+  else{era='昭和';year=y-1925;}
+  return `${era}${year}年${m}月${day}日`;
+}
+
 function buildPlaceholders(c, emp, settings){
   const site=c.sites||{};const client=site.clients||{};
   const wp=(site.work_patterns||[])[0]||{};
@@ -1313,7 +1357,7 @@ function buildPlaceholders(c, emp, settings){
   const hasKiki=(c.contract_employees||[]).some(e=>e.employment_type!=='permanent');
   return{
     CONTRACT_NO: v(c.contract_no),
-    CONTRACT_DATE: today,
+    CONTRACT_DATE: v(c.contract_date) || today,
     CONTRACT_START: v(c.contract_start),
     CONTRACT_END: v(c.contract_end),
     DISPATCH_START: v(c.contract_start),
@@ -1339,6 +1383,8 @@ function buildPlaceholders(c, emp, settings){
     WORK_LOCATION_ADDRESS: v(site.address),
     WORK_LOCATION_DETAIL: v(site.address),
     WORK_DEPT: v(site.work_dept),WORK_TEL: v(site.work_tel),
+    MUKIROGEN: site.mukirogen||'none',
+    KYOTEI: site.kyotei||'yes',
     ORGANIZATION_UNIT: v(site.organization_unit),
     UNIT_MANAGER_TITLE: v(site.unit_manager_title),
     CMD_DEPT: v(site.cmd_dept),
@@ -1490,7 +1536,7 @@ function buildKobetsuHtml(ph){
 }
 </style>
 
-<div class="meta" style="text-align:right;">契約No.${e(ph.CONTRACT_NO)}　　令和　　年　　月　　日</div>
+<div class="meta" style="text-align:right;">契約No.${e(ph.CONTRACT_NO)}　　${ph.CONTRACT_DATE ? toWareki(ph.CONTRACT_DATE) : '令和　　年　　月　　日'}</div>
 <h1>労 働 者 派 遣 個 別 契 約 書</h1>
 <div class="intro">
   ${e(ph.COMPANY_NAME)}（派遣元）は、${e(ph.CLIENT_NAME)}（派遣先）に対し、次の条件のもとに、労働者派遣を行うものとする。
@@ -1504,11 +1550,11 @@ ${tbl(r('名称・所在地', e(ph.WORK_LOCATION_NAME)+'　'+e(ph.WORK_LOCATION_
 
 ${section('派遣労働者を無期雇用又は60歳以上に限定するか否か')}
 <div style="border:1px solid #666;padding:3px 8px;font-size:9.5pt;">
-  □ 無期雇用派遣労働者に限定　又は 60歳以上の者に限定　　☑ 限定なし
+  ${ph.MUKIROGEN==='mukirogen' ? '☑' : '□'} 無期雇用派遣労働者に限定　又は 60歳以上の者に限定　　${ph.MUKIROGEN==='none' ? '☑' : '□'} 限定なし
 </div>
 
 ${section('協定対象派遣労働者に限定するか否か／派遣人員')}
-${tbl(`<tr><td style="${labelStyle}">協定対象限定</td><td style="${valStyle}">☑ 協定対象派遣労働者に限定　□ 限定なし</td><td style="${labelStyle};white-space:nowrap;width:auto;">派遣人員</td><td style="border:1px solid #666;padding:3px 8px;font-size:9.5pt;white-space:nowrap;width:auto;">${e(ph.STAFF_COUNT)}人</td></tr>`)}
+${tbl(`<tr><td style="${labelStyle}">協定対象限定</td><td style="${valStyle}">${ph.KYOTEI==='yes'?'☑':'□'} 協定対象派遣労働者に限定　${ph.KYOTEI==='no'?'☑':'□'} 限定なし</td><td style="${labelStyle};white-space:nowrap;width:auto;">派遣人員</td><td style="border:1px solid #666;padding:3px 8px;font-size:9.5pt;white-space:nowrap;width:auto;">${e(ph.STAFF_COUNT)}人</td></tr>`)}
 
 ${section('業務内容')}
 ${tbl(r('業務内容詳細', e(ph.JOB_DETAIL)))}
@@ -1555,24 +1601,52 @@ ${section('派遣先が派遣労働者を雇用する場合の紛争防止措置
   派遣先が派遣終了後に、当該派遣労働者を雇用する場合、その雇用意思を事前に派遣元へ示すこととする。
 </div>
 
-${section('労働者派遣契約の解除に当たって講ずる措置')}
-<div style="border:1px solid #666;padding:3px 8px;font-size:9pt;line-height:1.8;">
-  （1）事前申入れ：派遣先の責に帰すべき事由により解除する場合、相当の猶予期間をもって申入れを行う。<br>
-  （2）就業機会の確保：派遣先・派遣元は新たな就業機会の確保を図る。<br>
-  （3）損害賠償：派遣先の責による解除の場合、休業手当相当額以上の賠償を行う。<br>
-  （4）理由の明示：派遣元から請求があったときは、解除の理由を明らかにする。
+${section('労働者派遣契約の解除に当たって講ずる派遣労働者の雇用の安定を図るために必要な措置')}
+<div style="border:1px solid #666;padding:5px 10px;font-size:9pt;line-height:1.85;">
+  <div style="font-weight:bold;margin-bottom:2px;">（1）労働者派遣契約の解除の事前の申入れ</div>
+  <div style="margin-bottom:6px;text-indent:1em;">派遣先は、専ら派遣先に起因する事由により、労働者派遣契約の契約期間が満了する前の解除を行おうとする場合には、派遣元の合意を得ることはもとより、あらかじめ相当の猶予期間をもって派遣元に解除の申入れを行うこととする。</div>
+  <div style="font-weight:bold;margin-bottom:2px;">（2）派遣先における就業機会の確保</div>
+  <div style="margin-bottom:6px;text-indent:1em;">派遣先及び派遣元は、労働者派遣契約の契約期間が満了する前に派遣労働者の責に帰すべき事由によらない労働者派遣契約の解除を行った場合には、派遣先の関連会社での就業をあっせんする等により、当該労働者派遣契約に係る派遣労働者の新たな就業機会の確保を図ることとする。</div>
+  <div style="font-weight:bold;margin-bottom:2px;">（3）損害賠償等に係る適切な措置</div>
+  <div style="margin-bottom:6px;text-indent:1em;">派遣先は、派遣先の責に帰すべき事由により労働者派遣契約の契約期間が満了する前に労働者派遣契約の解除を行おうとする場合には、派遣労働者の新たな就業機会の確保を図ることとし、これができないときには、少なくとも当該労働者派遣契約の解除に伴い派遣元が労働者派遣契約に係る派遣労働者を休業させること等を余儀なくされたことにより生じた休業手当に相当する額以上の額について、また派遣元がやむを得ない事由により当該派遣労働者を解雇する場合は、派遣先による解除の申し入れが相当の猶予期間をもって行われなかったことにより、派遣元が解雇の予告をしないときは、少なくとも30日分以上の賃金に相当する額について、当該予告をした日から解雇の日までの期間が30日に満たないときは当該解雇の日30日前から当該予告の日までの日数分以上の賃金に相当する額についての損害の賠償を行わなければならないこととする。その他派遣先は派遣元と十分に協議した上で適切な善後処理方策を講ずることとする。また、派遣先及び派遣元双方の責に帰すべき事由がある場合には、派遣先及び派遣元のそれぞれの責に帰すべき部分の割合についても十分に考慮することとする。</div>
+  <div style="font-weight:bold;margin-bottom:2px;">（4）労働者派遣契約の解除の理由の明示</div>
+  <div style="text-indent:1em;">派遣先は、労働者派遣契約の契約期間が満了する前に労働者派遣契約の解除を行おうとする場合であって、派遣元から請求があったときは、労働者派遣契約の解除を行った理由を派遣元に対して明らかにすることとする。</div>
 </div>
 
-${section('苦情の申出先・処理方法・連携体制')}
-${tbl(`
-  <tr><td style="${labelStyle}">（1）苦情申出を受ける者<br>派遣先</td><td style="${valStyle}">（部署）${e(ph.COMPLAINT_CLIENT_DEPT)}　（役職）${e(ph.COMPLAINT_CLIENT_TITLE)}　（氏名）${e(ph.COMPLAINT_CLIENT_NAME)}　（電話）${e(ph.COMPLAINT_CLIENT_TEL)}</td></tr>
-  <tr><td style="${labelStyle}">派遣元</td><td style="${valStyle}">（部署）${e(ph.COMPLAINT_HAKEN_DEPT)}　（役職）${e(ph.COMPLAINT_HAKEN_TITLE)}　（氏名）${e(ph.COMPLAINT_HAKEN_NAME)}　（電話）${e(ph.COMPLAINT_HAKEN_TEL)}</td></tr>
-  <tr><td style="${labelStyle}">（2）処理方法・連携体制</td><td style="${valStyle}" style="font-size:9pt;">
-    ①派遣先で受けた苦情は直ちに派遣先責任者へ連絡し、誠意をもって迅速に処理し結果を派遣労働者に通知する。<br>
-    ②派遣元で受けた苦情は直ちに派遣元責任者へ連絡し、誠意をもって迅速に処理し結果を派遣労働者に通知する。<br>
-    ③双方は相互に遅滞なく通知・連絡調整を行い解決を図る。
-  </td></tr>
-`)}
+${section('苦情の申出先、処理方法・連携体制')}
+<div style="border:1px solid #666;padding:4px 8px;font-size:9pt;">
+  <div style="font-weight:bold;margin-bottom:3px;">（1）苦情の申出を受ける者</div>
+  <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+    <tr>
+      <td style="border:1px solid #999;padding:2px 6px;background:#f5f5f5;font-weight:bold;white-space:nowrap;">派遣先</td>
+      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（部署）</td>
+      <td style="border:1px solid #999;padding:2px 6px;min-width:80px;">${e(ph.COMPLAINT_CLIENT_DEPT)}</td>
+      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（役職）</td>
+      <td style="border:1px solid #999;padding:2px 6px;min-width:80px;">${e(ph.COMPLAINT_CLIENT_TITLE)}</td>
+      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（氏名）</td>
+      <td style="border:1px solid #999;padding:2px 6px;min-width:80px;">${e(ph.COMPLAINT_CLIENT_NAME)}</td>
+      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（電話）</td>
+      <td style="border:1px solid #999;padding:2px 6px;min-width:100px;">${e(ph.COMPLAINT_CLIENT_TEL)}</td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #999;padding:2px 6px;background:#f5f5f5;font-weight:bold;white-space:nowrap;">派遣元</td>
+      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（部署）</td>
+      <td style="border:1px solid #999;padding:2px 6px;">${e(ph.COMPLAINT_HAKEN_DEPT)}</td>
+      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（役職）</td>
+      <td style="border:1px solid #999;padding:2px 6px;">${e(ph.COMPLAINT_HAKEN_TITLE)}</td>
+      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（氏名）</td>
+      <td style="border:1px solid #999;padding:2px 6px;">${e(ph.COMPLAINT_HAKEN_NAME)}</td>
+      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（電話）</td>
+      <td style="border:1px solid #999;padding:2px 6px;">${e(ph.COMPLAINT_HAKEN_TEL)}</td>
+    </tr>
+  </table>
+  <div style="font-weight:bold;margin-bottom:3px;">（2）苦情処理方法、連携体制等</div>
+  <div style="line-height:1.9;">
+    　①派遣先における(1)記載の者が苦情の申出を受けたときは、ただちに派遣先責任者へ連絡することとし、当該派遣先責任者が中心となって誠意をもって、遅滞なく、当該苦情の適切かつ迅速な処理を図ることとし、その結果について必ず派遣労働者に通知することとする。<br>
+    　②派遣元における(1)記載の者が苦情の申出を受けたときは、ただちに派遣元責任者へ連絡することとし、当該派遣元責任者が中心となって誠意をもって、遅滞なく、当該苦情の適切かつ迅速な処理を図ることとし、その結果について必ず派遣労働者に通知することとする。<br>
+    　③派遣先及び派遣元は、自らでその解決が容易であり、即時に処理した苦情の他は、相互に遅滞なく通知するとともに、密接に連絡調整を行いつつ、その解決を図ることとする。
+  </div>
+</div>
 
 <div class="sign-grid">
   <div class="sign-box">
