@@ -1365,15 +1365,21 @@ function replacePlaceholders(text, ph){
 
 // テンプレートテキストからdocxを生成（シンプルなテキスト版）
 async function createSimpleDocx(title, bodyText, filename){
-  const {Document,Packer,Paragraph,TextRun,AlignmentType}=docx;
-  const lines=bodyText.split('\n');
-  const children=[
-    new Paragraph({children:[new TextRun({text:title,bold:true,size:28})],alignment:AlignmentType.CENTER,spacing:{after:400}}),
-    ...lines.map(line=>new Paragraph({children:[new TextRun({text:line,size:20})],spacing:{after:100}})),
-  ];
-  const doc=new Document({sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:1134,right:1134,bottom:1134,left:1134}}},children}]});
-  const buf=await Packer.toBuffer(doc);
-  saveAs(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),filename);
+  try{
+    const {Document,Packer,Paragraph,TextRun,AlignmentType}=docx;
+    const lines=bodyText.split('\n');
+    const children=[
+      new Paragraph({children:[new TextRun({text:title,bold:true,size:28})],alignment:AlignmentType.CENTER,spacing:{after:400}}),
+      ...lines.map(line=>new Paragraph({children:[new TextRun({text:line,size:20})],spacing:{after:100}})),
+    ];
+    const doc=new Document({sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:1134,right:1134,bottom:1134,left:1134}}},children}]});
+    const buf=await Packer.toBuffer(doc);
+    saveAs(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),filename);
+  }catch(e){
+    console.error('docx生成エラー',e);
+    toast('書類生成に失敗しました：'+e.message,'error');
+    throw e;
+  }
 }
 
 // 個別契約書
@@ -1547,62 +1553,65 @@ const TEMPLATES = {
 };
 
 async function genDoc(type){
-  const c=currentDocContract;if(!c)return;
-  const settings=await getSettingsData();
-  const tmpl=TEMPLATES[type];if(!tmpl)return;
-  // 現場単位書類（派遣先・元管理台帳）はスタッフごとに1枚ずつ生成
-  const emps=Object.values(c._empData||{});
-  if(['sakicho','motocho'].includes(type)&&emps.length>1){
-    for(const emp of emps){
+  const c=currentDocContract;if(!c){toast('契約データがありません','error');return;}
+  try{
+    const settings=await getSettingsData();
+    const tmpl=TEMPLATES[type];if(!tmpl)return;
+    const emps=Object.values(c._empData||{});
+    if(['sakicho','motocho'].includes(type)&&emps.length>1){
+      for(const emp of emps){
+        const ph=buildPlaceholders(c,emp,settings);
+        const text=replacePlaceholders(tmpl.body,ph);
+        const name=`${emp.sei}${emp.mei}`;
+        await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${name}_${c.contract_no||'doc'}.docx`);
+      }
+    } else {
+      const emp=emps[0]||null;
       const ph=buildPlaceholders(c,emp,settings);
       const text=replacePlaceholders(tmpl.body,ph);
-      const name=`${emp.sei}${emp.mei}`;
-      await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${name}_${c.contract_no||'doc'}.docx`);
+      await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${c.contract_no||'doc'}.docx`);
     }
-  } else {
-    const emp=emps[0]||null;
-    const ph=buildPlaceholders(c,emp,settings);
-    const text=replacePlaceholders(tmpl.body,ph);
-    await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${c.contract_no||'doc'}.docx`);
-  }
-  toast(`${tmpl.title}を生成しました`,'success');
+    toast(`${tmpl.title}を生成しました`,'success');
+  }catch(e){console.error(e);}
 }
 
 async function genEmpDoc(type,empId){
-  const c=currentDocContract;if(!c)return;
-  const settings=await getSettingsData();
-  const emp=(c._empData||{})[empId];
-  const tmpl=TEMPLATES[type];if(!tmpl)return;
-  const ph=buildPlaceholders(c,emp,settings);
-  const text=replacePlaceholders(tmpl.body,ph);
-  const name=emp?`${emp.sei}${emp.mei}`:`ID${empId}`;
-  await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${name}_${c.contract_no||'doc'}.docx`);
-  toast(`${tmpl.title}（${name}）を生成しました`,'success');
+  const c=currentDocContract;if(!c){toast('契約データがありません','error');return;}
+  try{
+    const settings=await getSettingsData();
+    const emp=(c._empData||{})[empId];
+    const tmpl=TEMPLATES[type];if(!tmpl)return;
+    const ph=buildPlaceholders(c,emp,settings);
+    const text=replacePlaceholders(tmpl.body,ph);
+    const name=emp?`${emp.sei}${emp.mei}`:`ID${empId}`;
+    await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${name}_${c.contract_no||'doc'}.docx`);
+    toast(`${tmpl.title}（${name}）を生成しました`,'success');
+  }catch(e){console.error(e);}
 }
 
 async function genAllDocs(){
-  const c=currentDocContract;if(!c)return;
-  const settings=await getSettingsData();
-  const emps=Object.values(c._empData||{});
-  // 現場単位
-  for(const type of['kobetsu']){
-    const tmpl=TEMPLATES[type];const emp=emps[0]||null;
-    const ph=buildPlaceholders(c,emp,settings);
-    const text=replacePlaceholders(tmpl.body,ph);
-    await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${c.contract_no||'doc'}.docx`);
-  }
-  // スタッフごと（雇用契約書兼就業条件明示書・管理台帳）
-  for(const ce of(c.contract_employees||[])){
-    const emp=(c._empData||{})[ce.employee_id];
-    const name=emp?`${emp.sei}${emp.mei}`:`ID${ce.employee_id}`;
-    for(const type of['sakicho','motocho','koyo_joken']){
-      const tmpl=TEMPLATES[type];
+  const c=currentDocContract;if(!c){toast('契約データがありません','error');return;}
+  try{
+    const settings=await getSettingsData();
+    const emps=Object.values(c._empData||{});
+    for(const type of['kobetsu']){
+      const tmpl=TEMPLATES[type];const emp=emps[0]||null;
       const ph=buildPlaceholders(c,emp,settings);
       const text=replacePlaceholders(tmpl.body,ph);
-      await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${name}_${c.contract_no||'doc'}.docx`);
+      await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${c.contract_no||'doc'}.docx`);
     }
-  }
-  toast('全書類を生成しました','success');
+    for(const ce of(c.contract_employees||[])){
+      const emp=(c._empData||{})[ce.employee_id];
+      const name=emp?`${emp.sei}${emp.mei}`:`ID${ce.employee_id}`;
+      for(const type of['sakicho','motocho','koyo_joken']){
+        const tmpl=TEMPLATES[type];
+        const ph=buildPlaceholders(c,emp,settings);
+        const text=replacePlaceholders(tmpl.body,ph);
+        await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${name}_${c.contract_no||'doc'}.docx`);
+      }
+    }
+    toast('全書類を生成しました','success');
+  }catch(e){console.error(e);}
 }
 
 // ===== BILLING =====
