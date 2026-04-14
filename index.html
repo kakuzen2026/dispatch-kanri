@@ -5,137 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>派遣管理台帳</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-// ===== 軽量docx生成（外部ライブラリ不要・ブラウザ標準APIのみ） =====
-window.MiniDocx = {
-  async generate(title, bodyText, filename) {
-    // docxはZIPファイル。必要な最小限のXMLを組み立てる
-    const lines = bodyText.split('\n');
-    const para = (text, bold, center) => {
-      const rPr = bold ? '<w:rPr><w:b/><w:sz w:val="28"/></w:rPr>' : '<w:rPr><w:sz w:val="20"/></w:rPr>';
-      const pPr = center ? '<w:pPr><w:jc w:val="center"/><w:spacing w:after="400"/></w:pPr>' : '<w:pPr><w:spacing w:after="100"/></w:pPr>';
-      const escaped = String(text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-      return `<w:p>${pPr}<w:r>${rPr}<w:t xml:space="preserve">${escaped}</w:t></w:r></w:p>`;
-    };
-    const paras = [para(title, true, true), ...lines.map(l => para(l, false, false))].join('');
-    const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-<w:body>${paras}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr></w:body></w:document>`;
-
-    const relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>`;
-
-    const wordRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>`;
-
-    const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-<Default Extension="xml" ContentType="application/xml"/>
-<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>`;
-
-    // JSZipなしでZIPを組み立てる（簡易実装）
-    const zip = await MiniDocx._buildZip([
-      { name: '[Content_Types].xml', data: contentTypesXml },
-      { name: '_rels/.rels', data: relsXml },
-      { name: 'word/document.xml', data: docXml },
-      { name: 'word/_rels/document.xml.rels', data: wordRelsXml },
-    ]);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([zip], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
-    a.download = filename;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  },
-
-  // 簡易ZIP構築（非圧縮ストアモード）
-  async _buildZip(files) {
-    const enc = new TextEncoder();
-    const parts = [];
-    const centralDir = [];
-    let offset = 0;
-
-    for (const f of files) {
-      const nameBytes = enc.encode(f.name);
-      const dataBytes = enc.encode(f.data);
-      const crc = MiniDocx._crc32(dataBytes);
-      const size = dataBytes.length;
-
-      // Local file header
-      const lh = new DataView(new ArrayBuffer(30 + nameBytes.length));
-      lh.setUint32(0, 0x04034b50, true); // signature
-      lh.setUint16(4, 20, true);  // version needed
-      lh.setUint16(6, 0, true);   // flags
-      lh.setUint16(8, 0, true);   // compression: store
-      lh.setUint16(10, 0, true);  // mod time
-      lh.setUint16(12, 0, true);  // mod date
-      lh.setUint32(14, crc, true);
-      lh.setUint32(18, size, true);
-      lh.setUint32(22, size, true);
-      lh.setUint16(26, nameBytes.length, true);
-      lh.setUint16(28, 0, true);
-      new Uint8Array(lh.buffer).set(nameBytes, 30);
-
-      // Central directory entry
-      const cd = new DataView(new ArrayBuffer(46 + nameBytes.length));
-      cd.setUint32(0, 0x02014b50, true);
-      cd.setUint16(4, 20, true); cd.setUint16(6, 20, true);
-      cd.setUint16(8, 0, true); cd.setUint16(10, 0, true);
-      cd.setUint16(12, 0, true); cd.setUint16(14, 0, true);
-      cd.setUint32(16, crc, true);
-      cd.setUint32(20, size, true);
-      cd.setUint32(24, size, true);
-      cd.setUint16(28, nameBytes.length, true);
-      cd.setUint16(30, 0, true); cd.setUint16(32, 0, true);
-      cd.setUint16(34, 0, true); cd.setUint16(36, 0, true);
-      cd.setUint32(38, 0, true);
-      cd.setUint32(42, offset, true);
-      new Uint8Array(cd.buffer).set(nameBytes, 46);
-
-      parts.push(new Uint8Array(lh.buffer), dataBytes);
-      centralDir.push(new Uint8Array(cd.buffer));
-      offset += lh.buffer.byteLength + size;
-    }
-
-    const cdBytes = MiniDocx._concat(centralDir);
-    const eocd = new DataView(new ArrayBuffer(22));
-    eocd.setUint32(0, 0x06054b50, true);
-    eocd.setUint16(4, 0, true); eocd.setUint16(6, 0, true);
-    eocd.setUint16(8, files.length, true);
-    eocd.setUint16(10, files.length, true);
-    eocd.setUint32(12, cdBytes.byteLength, true);
-    eocd.setUint32(16, offset, true);
-    eocd.setUint16(20, 0, true);
-
-    return MiniDocx._concat([...parts, cdBytes, new Uint8Array(eocd.buffer)]);
-  },
-
-  _concat(arrays) {
-    const total = arrays.reduce((s, a) => s + a.byteLength, 0);
-    const result = new Uint8Array(total);
-    let pos = 0;
-    for (const a of arrays) { result.set(a, pos); pos += a.byteLength; }
-    return result;
-  },
-
-  _crc32(data) {
-    if (!MiniDocx._crcTable) {
-      MiniDocx._crcTable = new Uint32Array(256);
-      for (let i = 0; i < 256; i++) {
-        let c = i;
-        for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-        MiniDocx._crcTable[i] = c;
-      }
-    }
-    let crc = 0xFFFFFFFF;
-    for (let i = 0; i < data.length; i++) crc = MiniDocx._crcTable[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8);
-    return (crc ^ 0xFFFFFFFF) >>> 0;
-  }
-};
-</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
 :root{--bg:#0f1117;--bg2:#161b27;--bg3:#1e2535;--border:#2a3347;--accent:#3b82f6;--accent2:#60a5fa;--success:#22c55e;--warning:#f59e0b;--danger:#ef4444;--text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;--radius:8px;}
@@ -707,7 +576,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
   <div class="modal modal-lg">
     <div class="modal-header"><h2 id="docs-title">📄 書類を生成</h2><button class="btn btn-secondary btn-sm" onclick="closeModal('modal-docs')">✕</button></div>
     <div class="modal-body">
-      <div class="alert alert-info">ℹ️ 生成した書類はWord形式（.docx）でダウンロードされます。</div>
+      <div class="alert alert-info">ℹ️ 印刷ダイアログが開きます。送信先で「PDFに保存」を選ぶとPDF保存できます。</div>
       <div id="docs-contract-info" style="margin-bottom:16px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;"></div>
       <h3 style="font-size:13px;font-weight:600;margin-bottom:12px;">現場単位の書類（1通）</h3>
       <div class="doc-btn-grid" id="docs-site-btns"></div>
@@ -1494,206 +1363,266 @@ function replacePlaceholders(text, ph){
 
 // テンプレートテキストからdocxを生成（外部ライブラリ不要）
 async function createSimpleDocx(title, bodyText, filename){
-  try{
-    await MiniDocx.generate(title, bodyText, filename);
-  }catch(e){
-    console.error('docx生成エラー',e);
-    toast('書類生成に失敗しました：'+e.message,'error');
-    throw e;
-  }
+  // 後方互換：PDF生成にリダイレクト（呼ばれることはないが念のため残す）
+  openPdfWindow(title, `<pre style="font-family:'MS Mincho',serif;font-size:12px;line-height:1.8;white-space:pre-wrap;">${esc(bodyText)}</pre>`, filename);
 }
 
-// 個別契約書
-const TEMPLATES = {
-  kobetsu:{
-    title:'労 働 者 派 遣 個 別 契 約 書',
-    body:`契約No.【CONTRACT_NO】　締結日：【CONTRACT_DATE】
+// ===== HTML → PDF印刷 =====
+function openPdfWindow(title, bodyHtml, filename){
+  const css = `
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'MS Mincho','Yu Mincho','Hiragino Mincho ProN',serif;font-size:10.5pt;line-height:1.8;color:#000;background:#fff;padding:15mm 18mm;}
+    h1{font-size:16pt;font-weight:bold;text-align:center;letter-spacing:4px;margin:0 0 8mm;}
+    h2{font-size:11pt;font-weight:bold;background:#f0f0f0;border:1px solid #999;padding:3px 8px;margin:6mm 0 2mm;}
+    h3{font-size:10.5pt;font-weight:bold;border-left:3px solid #333;padding-left:6px;margin:4mm 0 2mm;}
+    table{width:100%;border-collapse:collapse;margin:2mm 0;}
+    th,td{border:1px solid #999;padding:4px 8px;font-size:10pt;vertical-align:top;}
+    th{background:#f5f5f5;font-weight:bold;white-space:nowrap;width:32%;}
+    td{width:68%;}
+    .meta{text-align:right;font-size:9pt;margin-bottom:6mm;color:#333;}
+    .parties{display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin:4mm 0 6mm;}
+    .party{border:1px solid #999;padding:4px 8px;}
+    .party-label{font-weight:bold;border-bottom:1px solid #999;margin-bottom:2px;padding-bottom:2px;font-size:9.5pt;}
+    .party-body{font-size:9.5pt;line-height:1.7;}
+    .sign-area{display:grid;grid-template-columns:1fr 1fr;gap:6mm;margin-top:10mm;}
+    .sign-box{border:1px solid #999;padding:6px 10px;min-height:25mm;}
+    .sign-label{font-size:9pt;color:#555;margin-bottom:4px;border-bottom:1px solid #ddd;padding-bottom:2px;}
+    .sign-line{margin-top:8mm;border-bottom:1px solid #333;width:80%;}
+    .note{font-size:9pt;color:#555;margin-top:6mm;line-height:1.6;border-top:1px solid #ccc;padding-top:4mm;}
+    .stamp{display:inline-block;width:14mm;height:14mm;border:2px solid #c00;border-radius:50%;text-align:center;line-height:14mm;color:#c00;font-size:9pt;vertical-align:middle;margin-left:4px;}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:4mm;}
+    .section{margin:4mm 0;}
+    @media print{
+      body{padding:10mm 15mm;}
+      @page{size:A4;margin:0;}
+    }
+  `;
+  const w = window.open('','_blank','width=900,height=1100');
+  if(!w){toast('ポップアップがブロックされました。ブラウザの設定でこのサイトのポップアップを許可してください。','error');return;}
+  w.document.write(`<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>${esc(title)}</title><style>${css}</style></head><body>${bodyHtml}<script>window.onload=function(){window.print();}<\/script></body></html>`);
+  w.document.close();
+}
 
-【COMPANY_NAME】（派遣元）は、【CLIENT_NAME】（派遣先）に対し、次の条件のもとに労働者派遣を行う。
+function e(val){ return val ? String(val).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+function row(label, val){ return `<tr><th>${e(label)}</th><td>${e(val)||'&nbsp;'}</td></tr>`; }
+function row2(l1,v1,l2,v2){ return `<tr><th>${e(l1)}</th><td>${e(v1)||'&nbsp;'}</td><th>${e(l2)}</th><td>${e(v2)||'&nbsp;'}</td></tr>`; }
 
-【派遣先事業所】【CLIENT_SITE_NAME】　【CLIENT_SITE_ADDRESS】
-【就業場所】【WORK_LOCATION_NAME】　【WORK_LOCATION_ADDRESS】
-【派遣人員】【STAFF_COUNT】人
-【業務内容】【JOB_DETAIL】
-【業務に伴う責任の程度】【AUTHORITY_DETAIL】
-【組織単位】【ORGANIZATION_UNIT】（【UNIT_MANAGER_TITLE】）
-【指揮命令者】（部署）【CMD_DEPT】（役職）【CMD_TITLE】（氏名）【CMD_NAME】（電話）【CMD_TEL】
-【派遣期間】【DISPATCH_START】から【DISPATCH_END】
-【就業日】【WORK_DAYS】
-【就業時間及び休憩時間】【WORK_START】から【WORK_END】（休憩時間【BREAK_TIME】）
-【就業日外・時間外労働】【OVERTIME_RULE】
-【派遣先責任者】（部署）【CLIENT_MGR_DEPT】（役職）【CLIENT_MGR_TITLE】（氏名）【CLIENT_MGR_NAME】（電話）【CLIENT_MGR_TEL】
-【派遣元責任者】（部署）【HAKEN_MGR_DEPT】（役職）【HAKEN_MGR_TITLE】（氏名）【HAKEN_MGR_NAME】（電話）【HAKEN_MGR_TEL】
-【安全及び衛生】【SAFETY_CONTENT】
-【福祉増進のための便宜供与】【WELFARE_CONTENT】
+// ===== HTML テンプレート生成関数 =====
+function buildKobetsuHtml(ph){
+  return `
+    <div class="meta">締結日：${e(ph.CONTRACT_DATE)}　契約No.${e(ph.CONTRACT_NO)}</div>
+    <h1>労働者派遣個別契約書</h1>
+    <p style="text-align:center;margin-bottom:6mm;font-size:10pt;">（労働者派遣法第26条に基づく）</p>
+    <div class="parties">
+      <div class="party"><div class="party-label">派遣元（甲）</div><div class="party-body">
+        〒${e(ph.COMPANY_ADDRESS).substring(0,8)||''}<br>${e(ph.COMPANY_ADDRESS)}<br>
+        ${e(ph.COMPANY_NAME)}<br>代表者：${e(ph.COMPANY_CEO)}<br>
+        許可番号：${e(ph.LICENSE_NO)}
+      </div></div>
+      <div class="party"><div class="party-label">派遣先（乙）</div><div class="party-body">
+        ${e(ph.CLIENT_ADDRESS)}<br>
+        ${e(ph.CLIENT_NAME)}<br>代表者：${e(ph.CLIENT_CEO)}
+      </div></div>
+    </div>
+    <h2>第１条　派遣就業条件</h2>
+    <table>
+      ${row('派遣先事業所', ph.CLIENT_SITE_NAME+'　'+ph.CLIENT_SITE_ADDRESS)}
+      ${row('就業場所', ph.WORK_LOCATION_NAME+'　'+ph.WORK_LOCATION_ADDRESS)}
+      ${row('組織単位', ph.ORGANIZATION_UNIT+'（'+ph.UNIT_MANAGER_TITLE+'）')}
+      ${row('派遣人員', ph.STAFF_COUNT+'名')}
+      ${row('派遣期間', ph.DISPATCH_START+'　〜　'+ph.DISPATCH_END)}
+      ${row('業務内容', ph.JOB_DETAIL)}
+      ${row('業務に伴う責任の程度', ph.AUTHORITY_DETAIL)}
+    </table>
+    <h2>第２条　就業時間・休日</h2>
+    <table>
+      ${row('就業日', ph.WORK_DAYS)}
+      ${row('就業時間', ph.WORK_START+'　〜　'+ph.WORK_END+'（休憩：'+ph.BREAK_TIME+'）')}
+      ${row('時間外・休日労働', ph.OVERTIME_RULE)}
+    </table>
+    <h2>第３条　責任者</h2>
+    <table>
+      <tr><th>派遣先責任者</th><td>（部署）${e(ph.CLIENT_MGR_DEPT)}　（役職）${e(ph.CLIENT_MGR_TITLE)}　（氏名）${e(ph.CLIENT_MGR_NAME)}　（電話）${e(ph.CLIENT_MGR_TEL)}</td></tr>
+      <tr><th>派遣元責任者</th><td>（部署）${e(ph.HAKEN_MGR_DEPT)}　（役職）${e(ph.HAKEN_MGR_TITLE)}　（氏名）${e(ph.HAKEN_MGR_NAME)}　（電話）${e(ph.HAKEN_MGR_TEL)}</td></tr>
+      <tr><th>指揮命令者</th><td>（部署）${e(ph.CMD_DEPT)}　（役職）${e(ph.CMD_TITLE)}　（氏名）${e(ph.CMD_NAME)}　（電話）${e(ph.CMD_TEL)}</td></tr>
+    </table>
+    <h2>第４条　苦情申出先</h2>
+    <table>
+      <tr><th>派遣先</th><td>（部署）${e(ph.COMPLAINT_CLIENT_DEPT)}　（役職）${e(ph.COMPLAINT_CLIENT_TITLE)}　（氏名）${e(ph.COMPLAINT_CLIENT_NAME)}　（電話）${e(ph.COMPLAINT_CLIENT_TEL)}</td></tr>
+      <tr><th>派遣元</th><td>（部署）${e(ph.COMPLAINT_HAKEN_DEPT)}　（役職）${e(ph.COMPLAINT_HAKEN_TITLE)}　（氏名）${e(ph.COMPLAINT_HAKEN_NAME)}　（電話）${e(ph.COMPLAINT_HAKEN_TEL)}</td></tr>
+    </table>
+    <h2>第５条　安全衛生・福祉</h2>
+    <table>
+      ${row('安全及び衛生', ph.SAFETY_CONTENT)}
+      ${row('福祉増進の便宜供与', ph.WELFARE_CONTENT)}
+    </table>
+    <div class="sign-area">
+      <div class="sign-box"><div class="sign-label">派遣元（甲）署名</div>
+        ${e(ph.COMPANY_NAME)}<br>代表者：${e(ph.COMPANY_CEO)}<br>
+        <div class="sign-line"></div>署名　　　　　　　　　　　<span class="stamp">㊞</span>
+      </div>
+      <div class="sign-box"><div class="sign-label">派遣先（乙）署名</div>
+        ${e(ph.CLIENT_NAME)}<br>代表者：${e(ph.CLIENT_CEO)}<br>
+        <div class="sign-line"></div>署名　　　　　　　　　　　<span class="stamp">㊞</span>
+      </div>
+    </div>`;
+}
 
-【苦情の申出先】
-派遣先：（部署）【COMPLAINT_CLIENT_DEPT】（役職）【COMPLAINT_CLIENT_TITLE】（氏名）【COMPLAINT_CLIENT_NAME】（電話）【COMPLAINT_CLIENT_TEL】
-派遣元：（部署）【COMPLAINT_HAKEN_DEPT】（役職）【COMPLAINT_HAKEN_TITLE】（氏名）【COMPLAINT_HAKEN_NAME】（電話）【COMPLAINT_HAKEN_TEL】
+function buildSakichoHtml(ph){
+  return `
+    <h1>派遣先管理台帳</h1>
+    <p style="text-align:center;margin-bottom:6mm;font-size:10pt;">（労働者派遣法第42条に基づく）</p>
+    <table style="margin-bottom:4mm;">
+      ${row('派遣先事業所名', ph.CLIENT_SITE_NAME)}
+      ${row('所在地', ph.CLIENT_SITE_ADDRESS)}
+    </table>
+    <h2>派遣労働者情報</h2>
+    <table>
+      ${row('①　氏名', ph.EMPLOYEE_NAME)}
+      ${row('②　派遣元事業主', ph.COMPANY_NAME+'　（'+ph.COMPANY_ADDRESS+'）')}
+      ${row('⑤　協定対象', '協定対象派遣労働者')}
+      ${row('⑥　無期・有期の別', '有期雇用')}
+      ${row('⑦　派遣就業をした日', '（別紙タイムシートによる）')}
+      ${row('⑧　始業・終業・休憩', '（別紙タイムシートによる）')}
+      ${row('⑨　業務の種類', ph.JOB_DETAIL)}
+      ${row('⑩　業務に伴う責任の程度', ph.AUTHORITY_DETAIL)}
+      ${row('⑪　就業場所・組織単位', ph.CLIENT_SITE_NAME+'　組織単位：'+ph.ORGANIZATION_UNIT)}
+    </table>
+    <h2>責任者</h2>
+    <table>
+      <tr><th>⑮　派遣先責任者</th><td>（部署）${e(ph.CLIENT_MGR_DEPT)}　（役職）${e(ph.CLIENT_MGR_TITLE)}　（氏名）${e(ph.CLIENT_MGR_NAME)}　（電話）${e(ph.CLIENT_MGR_TEL)}</td></tr>
+      <tr><th>　　派遣元責任者</th><td>（部署）${e(ph.HAKEN_MGR_DEPT)}　（役職）${e(ph.HAKEN_MGR_TITLE)}　（氏名）${e(ph.HAKEN_MGR_NAME)}　（電話）${e(ph.HAKEN_MGR_TEL)}</td></tr>
+    </table>
+    <h2>月次通知事項（毎月1回以上通知義務）</h2>
+    <table>
+      ${row('氏名', ph.EMPLOYEE_NAME)}
+      ${row('就業日・始終業・休憩', '（別紙タイムシートによる）')}
+      ${row('業務の種類', ph.JOB_DETAIL)}
+      ${row('事業所名・就業場所', ph.CLIENT_SITE_NAME+'　'+ph.CLIENT_SITE_ADDRESS)}
+      ${row('組織単位', ph.ORGANIZATION_UNIT)}
+    </table>
+    <div class="note">※本台帳は派遣期間終了日から３年間保存すること（派遣法第42条第２項）</div>`;
+}
 
-派　遣　先　（所在地）【CLIENT_ADDRESS】（事業所名）【CLIENT_NAME】（代表者名）【CLIENT_CEO】　㊞
-派　遣　元　（所在地）【COMPANY_ADDRESS】（事業所名）【COMPANY_NAME】（代表者名）【COMPANY_CEO】（許可番号）【LICENSE_NO】　㊞`
-  },
-  sakicho:{
-    title:'派　遣　先　管　理　台　帳',
-    body:`（労働者派遣法第42条に基づく）
+function buildMotochoHtml(ph){
+  return `
+    <h1>派遣元管理台帳</h1>
+    <p style="text-align:center;margin-bottom:6mm;font-size:10pt;">（労働者派遣法第37条に基づく）</p>
+    <table style="margin-bottom:4mm;">
+      ${row('派遣元事業主名', ph.COMPANY_NAME)}
+      ${row('許可番号', ph.LICENSE_NO)}
+    </table>
+    <h2>派遣労働者情報</h2>
+    <table>
+      ${row('①　氏名', ph.EMPLOYEE_NAME)}
+      ${row('②　協定対象', '協定対象派遣労働者')}
+      ${row('③　無期・有期の別', '有期雇用（'+ph.CONTRACT_START+'〜'+ph.CONTRACT_END+'）')}
+      ${row('④　60歳以上か否か', '60歳未満')}
+      ${row('⑤　派遣先の名称', ph.CLIENT_NAME)}
+      ${row('⑥　派遣先事業所', ph.CLIENT_SITE_NAME)}
+      ${row('⑦　所在地・就業場所・組織単位', ph.CLIENT_SITE_ADDRESS+'　組織単位：'+ph.ORGANIZATION_UNIT)}
+      ${row('⑧　派遣期間・就業日', ph.DISPATCH_START+'〜'+ph.DISPATCH_END+'　就業日：'+ph.WORK_DAYS)}
+      ${row('⑨　始業・終業・休憩', '始業：'+ph.WORK_START+'　終業：'+ph.WORK_END+'　休憩：'+ph.BREAK_TIME)}
+      ${row('⑩　業務の種類', ph.JOB_DETAIL)}
+      ${row('⑪　業務に伴う責任の程度', ph.AUTHORITY_DETAIL)}
+      ${row('⑭　派遣元責任者', ph.HAKEN_MGR_NAME+'　（'+ph.HAKEN_MGR_DEPT+'）')}
+      ${row('　　派遣先責任者', ph.CLIENT_MGR_NAME+'　（'+ph.CLIENT_MGR_DEPT+'）')}
+      ${row('⑮　時間外・休日労働', ph.OVERTIME_RULE)}
+      ${row('⑰　雇用保険被保険者番号', ph.KOYO_HOKEN_NO)}
+      ${row('　　社会保険被保険者番号', ph.KENPO_NO)}
+    </table>
+    <div class="note">※本台帳は派遣期間終了日から３年間保存すること（派遣法第37条第２項）</div>`;
+}
 
-派遣先事業所名：【CLIENT_SITE_NAME】　所在地：【CLIENT_SITE_ADDRESS】
+function buildKoyoJokenHtml(ph){
+  return `
+    <div class="meta">締結日：${e(ph.CONTRACT_DATE)}　契約No.${e(ph.CONTRACT_NO)}</div>
+    <h1>雇用契約書　兼　就業条件明示書</h1>
+    <p style="text-align:center;margin-bottom:4mm;font-size:9.5pt;">（労働基準法第15条・労働者派遣法第34条・第31条の2　労使協定方式）</p>
+    <p style="margin-bottom:6mm;font-size:10pt;">
+      ${e(ph.COMPANY_NAME)}（以下「会社」という）と${e(ph.EMPLOYEE_NAME)}（以下「派遣労働者」という）は、以下のとおり雇用契約を締結するとともに就業条件を明示する。
+    </p>
+    <h2>第１部　雇用条件（労働基準法第15条）</h2>
+    <table>
+      ${row('氏名', ph.EMPLOYEE_NAME)}
+      ${row('生年月日', ph.BIRTH_DATE)}
+      ${row('住所', ph.EMPLOYEE_ADDRESS)}
+      ${row('雇用形態', '有期雇用（派遣）')}
+      ${row('契約期間', ph.CONTRACT_START+'　〜　'+ph.CONTRACT_END)}
+      ${row('就業場所（変更の範囲）', '会社の定める事業所')}
+      ${row('業務内容（変更の範囲）', '会社の定める業務全般')}
+      ${row('賃金', (ph.HOURLY_WAGE?'時給 '+ph.HOURLY_WAGE+'円':'')+(ph.MONTHLY_WAGE?'　月給 '+ph.MONTHLY_WAGE+'円':''))}
+      ${row('賃金締切・支払日', '毎月'+ph.PAY_CUTOFF+'日締　翌月'+ph.PAY_DATE+'日払')}
+      ${row('退職・解雇', '自己都合退職は'+ph.NOTICE_DAYS+'日前申出　解雇：労基法の定めによる')}
+      ${row('社会保険・労働保険', '健康保険・厚生年金保険・雇用保険・労災保険')}
+      ${row('無期転換申込権', '通算5年超で無期転換申込可（労契法18条）')}
+      ${row('協定対象の別', '協定対象（有効期間終期：'+ph.AGREEMENT_END_DATE+'）')}
+    </table>
+    <h2>第２部　就業条件明示（労働者派遣法第34条）</h2>
+    <table>
+      ${row('派遣先', ph.CLIENT_NAME)}
+      ${row('派遣先事業所', ph.CLIENT_SITE_NAME+'　'+ph.CLIENT_SITE_ADDRESS)}
+      ${row('就業場所', ph.WORK_LOCATION_DETAIL)}
+      ${row('業務内容', ph.JOB_DETAIL)}
+      ${row('責任の程度', ph.AUTHORITY_DETAIL)}
+      ${row('組織単位', ph.ORGANIZATION_UNIT+'（'+ph.UNIT_MANAGER_TITLE+'）')}
+      ${row('派遣期間', ph.DISPATCH_START+'　〜　'+ph.DISPATCH_END)}
+      ${row('就業日', ph.WORK_DAYS)}
+      ${row('就業時間・休憩', ph.WORK_START+'〜'+ph.WORK_END+'（休憩：'+ph.BREAK_TIME+'）')}
+      ${row('時間外・休日労働', ph.OVERTIME_RULE+'（36協定の範囲内）')}
+      ${row('事業所単位抵触日', ph.JISSAI_SHOKUCHOKU_DATE)}
+      ${row('組織単位抵触日', ph.SOSHIKI_SHOKUCHOKU_DATE)}
+      ${row('派遣料金', ph.HAKEN_RYOKIN+'円（税別・'+ph.RYOKIN_TANI+'あたり）')}
+      <tr><th>指揮命令者</th><td>（部署）${e(ph.CMD_DEPT)}　（役職）${e(ph.CMD_TITLE)}　（氏名）${e(ph.CMD_NAME)}　（電話）${e(ph.CMD_TEL)}</td></tr>
+      <tr><th>派遣先責任者</th><td>（部署）${e(ph.CLIENT_MGR_DEPT)}　（役職）${e(ph.CLIENT_MGR_TITLE)}　（氏名）${e(ph.CLIENT_MGR_NAME)}　（電話）${e(ph.CLIENT_MGR_TEL)}</td></tr>
+      <tr><th>派遣元責任者</th><td>（部署）${e(ph.HAKEN_MGR_DEPT)}　（役職）${e(ph.HAKEN_MGR_TITLE)}　（氏名）${e(ph.HAKEN_MGR_NAME)}　（電話）${e(ph.HAKEN_MGR_TEL)}</td></tr>
+      <tr><th>苦情申出先（派遣先）</th><td>（部署）${e(ph.COMPLAINT_CLIENT_DEPT)}　（氏名）${e(ph.COMPLAINT_CLIENT_NAME)}　（電話）${e(ph.COMPLAINT_CLIENT_TEL)}</td></tr>
+      <tr><th>苦情申出先（派遣元）</th><td>（部署）${e(ph.COMPLAINT_HAKEN_DEPT)}　（氏名）${e(ph.COMPLAINT_HAKEN_NAME)}　（電話）${e(ph.COMPLAINT_HAKEN_TEL)}</td></tr>
+      ${row('安全及び衛生', ph.SAFETY_CONTENT)}
+      ${row('福祉増進の便宜供与', ph.WELFARE_CONTENT)}
+    </table>
+    <p style="margin-top:6mm;font-size:9.5pt;">本書に定めのない事項は労働基準法・労働者派遣法その他関係法令による。</p>
+    <div class="sign-area">
+      <div class="sign-box"><div class="sign-label">派遣元（会社）署名</div>
+        所在地：${e(ph.COMPANY_ADDRESS)}<br>
+        会社名：${e(ph.COMPANY_NAME)}<br>
+        代表者：${e(ph.COMPANY_CEO)}　許可番号：${e(ph.LICENSE_NO)}<br>
+        <div class="sign-line"></div>署名　　　　　　　　　　　<span class="stamp">㊞</span>
+      </div>
+      <div class="sign-box"><div class="sign-label">派遣労働者署名</div>
+        住所：${e(ph.EMPLOYEE_ADDRESS)}<br>
+        氏名：${e(ph.EMPLOYEE_NAME)}<br>
+        <div class="sign-line"></div>署名　　　　　　　　　　　<span class="stamp">㊞</span>
+      </div>
+    </div>`;
+}
 
-① 派遣労働者の氏名：【EMPLOYEE_NAME】
-② 派遣元事業主の名称：【COMPANY_NAME】
-③ 派遣元事業主の事業所の名称：【COMPANY_SITE_NAME】
-④ 派遣元事業主の事業所の所在地：【COMPANY_ADDRESS】
-⑤ 協定対象派遣労働者か否かの別：協定対象派遣労働者
-⑥ 無期・有期の別：有期雇用
-⑦ 派遣就業をした日：（別紙タイムシートによる）
-⑧ 就業日ごとの始業・終業・休憩：（別紙タイムシートによる）
-⑨ 従事した業務の種類：【JOB_DETAIL】
-⑩ 業務に伴う責任の程度：【AUTHORITY_DETAIL】
-⑪ 就業した事業所・場所・組織単位：【CLIENT_SITE_NAME】　組織単位：【ORGANIZATION_UNIT】
-⑮ 派遣先責任者：（部署）【CLIENT_MGR_DEPT】（役職）【CLIENT_MGR_TITLE】（氏名）【CLIENT_MGR_NAME】（電話）【CLIENT_MGR_TEL】
-　　派遣元責任者：（部署）【HAKEN_MGR_DEPT】（役職）【HAKEN_MGR_TITLE】（氏名）【HAKEN_MGR_NAME】（電話）【HAKEN_MGR_TEL】
-
-【月次通知事項（毎月1回以上通知義務）】
-氏名：【EMPLOYEE_NAME】
-就業日・始終業・休憩：（別紙タイムシートによる）
-業務の種類：【JOB_DETAIL】
-事業所名・所在地・就業場所・組織単位：【CLIENT_SITE_NAME】　【CLIENT_SITE_ADDRESS】　組織単位：【ORGANIZATION_UNIT】
-
-※本台帳は派遣期間終了日から3年間保存すること（派遣法第42条第2項）`
-  },
-  motocho:{
-    title:'派　遣　元　管　理　台　帳',
-    body:`（労働者派遣法第37条に基づく）
-
-派遣元事業主名：【COMPANY_NAME】　許可番号：【LICENSE_NO】
-
-① 派遣労働者の氏名：【EMPLOYEE_NAME】
-② 協定対象派遣労働者か否かの別：協定対象派遣労働者
-③ 無期・有期の別（有期は契約期間）：有期雇用（契約期間：【CONTRACT_START】〜【CONTRACT_END】）
-④ 60歳以上か否かの別：60歳未満
-⑤ 派遣先の名称：【CLIENT_NAME】
-⑥ 派遣先事業所の名称：【CLIENT_SITE_NAME】
-⑦ 派遣先事業所の所在地・就業場所・組織単位：【CLIENT_SITE_ADDRESS】　組織単位：【ORGANIZATION_UNIT】
-⑧ 労働者派遣の期間・派遣就業をする日：【DISPATCH_START】〜【DISPATCH_END】　就業日：【WORK_DAYS】
-⑨ 始業・終業時刻：始業：【WORK_START】　終業：【WORK_END】　休憩：【BREAK_TIME】
-⑩ 従事する業務の種類：【JOB_DETAIL】
-⑪ 業務に伴う責任の程度：【AUTHORITY_DETAIL】
-⑭ 派遣元・先責任者：派遣元：【HAKEN_MGR_NAME】（部署）【HAKEN_MGR_DEPT】　派遣先：【CLIENT_MGR_NAME】（部署）【CLIENT_MGR_DEPT】
-⑮ 就業日外・時間外延長の定め：【OVERTIME_RULE】
-⑰ 社会保険・雇用保険資格取得届の提出有無：（各種届出状況を記載）
-　雇用保険被保険者番号：【KOYO_HOKEN_NO】
-　社会保険被保険者番号：【KENPO_NO】
-
-※本台帳は派遣期間終了日から3年間保存すること（派遣法第37条第2項）`
-  },
-  koyo:{
-    title:'雇　用　契　約　書',
-    body:`（労働基準法第15条に基づく労働条件明示）
-
-契約No.【CONTRACT_NO】　締結日：【CONTRACT_DATE】
-
-【COMPANY_NAME】（以下「会社」という）と【EMPLOYEE_NAME】（以下「労働者」という）は、以下のとおり雇用契約を締結する。
-
-【労働者情報】
-氏名：【EMPLOYEE_NAME】
-生年月日：【BIRTH_DATE】
-住所：【EMPLOYEE_ADDRESS】
-
-【労働条件（絶対的明示事項）】
-雇用形態：有期雇用（派遣）
-契約期間：【CONTRACT_START】から【CONTRACT_END】まで
-就業場所（雇入れ直後）：【WORK_LOCATION_NAME】
-就業場所（変更の範囲）：会社の定める事業所
-業務内容（雇入れ直後）：【JOB_DETAIL】
-業務内容（変更の範囲）：会社の定める業務全般
-始業・終業時刻・休憩時間：始業【WORK_START】　終業【WORK_END】　休憩時間【BREAK_TIME】
-時間外労働：あり（36協定の範囲内）
-休日：【HOLIDAY】
-賃金：時給【HOURLY_WAGE】円　月給【MONTHLY_WAGE】円
-　締切：毎月【PAY_CUTOFF】日　支払日：翌月【PAY_DATE】日
-退職・解雇：自己都合退職は【NOTICE_DAYS】日前に申出ること
-
-【相対的明示事項】
-年次有給休暇：労働基準法の定めによる（勤続6か月経過後10日付与）
-社会保険・労働保険：健康保険・厚生年金保険・雇用保険・労災保険
-無期転換申込権：通算契約期間が5年を超えた場合、無期雇用への転換を申し込む権利が生じる（労働契約法第18条）
-
-本契約に定めのない事項については、労働基準法その他の関係法令による。
-
-派遣元（会社）　（所在地）【COMPANY_ADDRESS】　（会社名）【COMPANY_NAME】　（代表者）【COMPANY_CEO】　㊞
-労　働　者　　　（住所）【EMPLOYEE_ADDRESS】　（氏名）【EMPLOYEE_NAME】　㊞`
-  },
-  koyo_joken:{
-    title:'雇用契約書　兼　就業条件明示書',
-    body:`（労働基準法第15条・労働者派遣法第34条・第31条の2　労使協定方式）
-
-契約No.【CONTRACT_NO】　締結日：【CONTRACT_DATE】
-
-【COMPANY_NAME】（派遣元）と【EMPLOYEE_NAME】（派遣労働者）は以下のとおり雇用契約を締結するとともに就業条件を明示する。
-
-【第１部　雇用条件（労働基準法第15条）】
-氏名：【EMPLOYEE_NAME】　生年月日：【BIRTH_DATE】　雇用形態：有期雇用（派遣）
-契約期間：【CONTRACT_START】〜【CONTRACT_END】
-就業場所（変更の範囲）：会社の定める事業所
-業務内容（変更の範囲）：会社の定める業務全般
-賃金：時給【HOURLY_WAGE】円　月給【MONTHLY_WAGE】円
-　締切：毎月【PAY_CUTOFF】日　支払：翌月【PAY_DATE】日
-退職・解雇：自己都合退職は【NOTICE_DAYS】日前申出　解雇：労基法の定めによる
-社会保険・労働保険：健保・厚年・雇保・労災（2026年10月〜週20h・月8.8万で全規模加入義務）
-無期転換申込権：通算5年超で無期転換申込可（労契法18条）
-協定対象の別：協定対象（有効期間終期：【AGREEMENT_END_DATE】）
-
-【第２部　就業条件明示（労働者派遣法第34条）】
-派遣先：【CLIENT_NAME】　派遣先事業所：【CLIENT_SITE_NAME】　【CLIENT_SITE_ADDRESS】
-就業場所（部署まで）：【WORK_LOCATION_DETAIL】
-業務内容：【JOB_DETAIL】
-責任の程度：【AUTHORITY_DETAIL】
-組織単位（長の職名）：【ORGANIZATION_UNIT】（【UNIT_MANAGER_TITLE】）
-派遣期間：【DISPATCH_START】〜【DISPATCH_END】
-就業日：【WORK_DAYS】
-就業時間・休憩：【WORK_START】〜【WORK_END】（休憩：【BREAK_TIME】）
-時間外・休日労働：【OVERTIME_RULE】（36協定の範囲内）
-事業所単位抵触日：【JISSAI_SHOKUCHOKU_DATE】
-組織単位抵触日：【SOSHIKI_SHOKUCHOKU_DATE】
-派遣料金：【HAKEN_RYOKIN】円（税別・【RYOKIN_TANI】あたり）
-指揮命令者：（部署）【CMD_DEPT】（役職）【CMD_TITLE】（氏名）【CMD_NAME】（電話）【CMD_TEL】
-派遣先責任者：（部署）【CLIENT_MGR_DEPT】（役職）【CLIENT_MGR_TITLE】（氏名）【CLIENT_MGR_NAME】（電話）【CLIENT_MGR_TEL】
-派遣元責任者：（部署）【HAKEN_MGR_DEPT】（役職）【HAKEN_MGR_TITLE】（氏名）【HAKEN_MGR_NAME】（電話）【HAKEN_MGR_TEL】
-苦情申出先（派遣先）：（部署）【COMPLAINT_CLIENT_DEPT】（氏名）【COMPLAINT_CLIENT_NAME】（電話）【COMPLAINT_CLIENT_TEL】
-苦情申出先（派遣元）：（部署）【COMPLAINT_HAKEN_DEPT】（氏名）【COMPLAINT_HAKEN_NAME】（電話）【COMPLAINT_HAKEN_TEL】
-安全及び衛生：【SAFETY_CONTENT】
-福祉増進の便宜供与：【WELFARE_CONTENT】
-社会保険等資格取得届：（各種届出状況を記載）
-
-本書に定めのない事項は労働基準法・労働者派遣法その他関係法令による。
-
-派　遣　元　（所在地）【COMPANY_ADDRESS】　（会社名）【COMPANY_NAME】　（代表者）【COMPANY_CEO】　（許可番号）【LICENSE_NO】　㊞
-派遣労働者　（住所）【EMPLOYEE_ADDRESS】　（氏名）【EMPLOYEE_NAME】　㊞`
-  },
+// ===== 書類生成（PDF） =====
+const DOC_BUILDERS = {
+  kobetsu: { title:'労働者派遣個別契約書', fn: buildKobetsuHtml },
+  sakicho: { title:'派遣先管理台帳',       fn: buildSakichoHtml },
+  motocho: { title:'派遣元管理台帳',       fn: buildMotochoHtml },
+  koyo_joken: { title:'雇用契約書兼就業条件明示書', fn: buildKoyoJokenHtml },
 };
 
 async function genDoc(type){
   const c=currentDocContract;if(!c){toast('契約データがありません','error');return;}
   try{
     const settings=await getSettingsData();
-    const tmpl=TEMPLATES[type];if(!tmpl)return;
+    const builder=DOC_BUILDERS[type];if(!builder)return;
     const emps=Object.values(c._empData||{});
-    if(['sakicho','motocho'].includes(type)&&emps.length>1){
+    if(['sakicho','motocho','koyo_joken'].includes(type)&&emps.length>1){
       for(const emp of emps){
         const ph=buildPlaceholders(c,emp,settings);
-        const text=replacePlaceholders(tmpl.body,ph);
-        const name=`${emp.sei}${emp.mei}`;
-        await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${name}_${c.contract_no||'doc'}.docx`);
+        openPdfWindow(builder.title, builder.fn(ph), '');
       }
     } else {
       const emp=emps[0]||null;
       const ph=buildPlaceholders(c,emp,settings);
-      const text=replacePlaceholders(tmpl.body,ph);
-      await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${c.contract_no||'doc'}.docx`);
+      openPdfWindow(builder.title, builder.fn(ph), '');
     }
-    toast(`${tmpl.title}を生成しました`,'success');
-  }catch(e){console.error(e);}
+    toast(builder.title+'を生成しました','success');
+  }catch(e){console.error(e);toast('生成に失敗しました：'+e.message,'error');}
 }
 
 async function genEmpDoc(type,empId){
@@ -1701,13 +1630,11 @@ async function genEmpDoc(type,empId){
   try{
     const settings=await getSettingsData();
     const emp=(c._empData||{})[empId];
-    const tmpl=TEMPLATES[type];if(!tmpl)return;
+    const builder=DOC_BUILDERS[type];if(!builder)return;
     const ph=buildPlaceholders(c,emp,settings);
-    const text=replacePlaceholders(tmpl.body,ph);
-    const name=emp?`${emp.sei}${emp.mei}`:`ID${empId}`;
-    await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${name}_${c.contract_no||'doc'}.docx`);
-    toast(`${tmpl.title}（${name}）を生成しました`,'success');
-  }catch(e){console.error(e);}
+    openPdfWindow(builder.title, builder.fn(ph), '');
+    toast(builder.title+'を生成しました','success');
+  }catch(e){console.error(e);toast('生成に失敗しました：'+e.message,'error');}
 }
 
 async function genAllDocs(){
@@ -1715,24 +1642,19 @@ async function genAllDocs(){
   try{
     const settings=await getSettingsData();
     const emps=Object.values(c._empData||{});
-    for(const type of['kobetsu']){
-      const tmpl=TEMPLATES[type];const emp=emps[0]||null;
-      const ph=buildPlaceholders(c,emp,settings);
-      const text=replacePlaceholders(tmpl.body,ph);
-      await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${c.contract_no||'doc'}.docx`);
-    }
+    // 個別契約書（現場単位）
+    const phSite=buildPlaceholders(c,emps[0]||null,settings);
+    openPdfWindow(DOC_BUILDERS.kobetsu.title, DOC_BUILDERS.kobetsu.fn(phSite), '');
+    // スタッフごと
     for(const ce of(c.contract_employees||[])){
       const emp=(c._empData||{})[ce.employee_id];
-      const name=emp?`${emp.sei}${emp.mei}`:`ID${ce.employee_id}`;
+      const ph=buildPlaceholders(c,emp,settings);
       for(const type of['sakicho','motocho','koyo_joken']){
-        const tmpl=TEMPLATES[type];
-        const ph=buildPlaceholders(c,emp,settings);
-        const text=replacePlaceholders(tmpl.body,ph);
-        await createSimpleDocx(tmpl.title,text,`${tmpl.title}_${name}_${c.contract_no||'doc'}.docx`);
+        openPdfWindow(DOC_BUILDERS[type].title, DOC_BUILDERS[type].fn(ph), '');
       }
     }
-    toast('全書類を生成しました','success');
-  }catch(e){console.error(e);}
+    toast('全書類を生成しました（印刷ダイアログで「PDFに保存」を選択してください）','success');
+  }catch(e){console.error(e);toast('生成に失敗しました：'+e.message,'error');}
 }
 
 // ===== BILLING =====
