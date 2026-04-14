@@ -1131,18 +1131,27 @@ async function openContractModal(cid){
 async function saveContract(){
   const id=document.getElementById('ct-id').value;
   if(!selEmps.length){toast('スタッフを1名以上選択してください','error');return;}
+  const siteId=document.getElementById('ct-site-id').value;
+  if(!siteId){toast('取引先 / 現場を選択してください','error');return;}
+
+  // 現場から業務内容等を引き継ぐ
+  const site=ST.sites.find(s=>s.id===siteId);
   const p={
-    site_id:document.getElementById('ct-site-id').value,
+    site_id:siteId,
     contract_no:document.getElementById('ct-no').value,
     contract_start:document.getElementById('ct-start').value,
     contract_end:document.getElementById('ct-end').value,
     haken_ryokin:document.getElementById('ct-ryokin').value,
     ryokin_tani:document.getElementById('ct-ryokin-tani').value,
+    job_detail:site?.job_detail||'',
+    authority_detail:site?.authority_detail||'',
+    overtime_rule:site?.overtime_rule||'',
+    work_days:site?.work_days||'',
     notes:document.getElementById('ct-notes').value,
     parent_contract_id:document.getElementById('ct-parent-id').value||null,
     status:'active',updated_at:new Date().toISOString(),
   };
-  if(!p.site_id||!p.contract_start||!p.contract_end){toast('必須項目を入力してください','error');return;}
+  if(!p.contract_start||!p.contract_end){toast('契約期間を入力してください','error');return;}
   let cid=id;
   if(id){await db.from('contracts').update(p).eq('id',id);}
   else{const {data,error}=await db.from('contracts').insert(p).select('id').single();if(error){toast('保存に失敗しました','error');return;}cid=data.id;}
