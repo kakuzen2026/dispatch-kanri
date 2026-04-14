@@ -276,7 +276,13 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <div class="nav-item" onclick="navigate('billing')"><span class="icon">💴</span>請求管理</div>
     <div class="nav-item" onclick="navigate('settings')"><span class="icon">⚙️</span>設定</div>
   </div>
-  <div class="sidebar-bottom"><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">v3.0.0</div></div>
+  <div class="nav-section" style="margin-top:auto;">
+    <div class="nav-section-label">連携</div>
+    <div class="nav-item" onclick="window.open('jugyoin.html','_blank')" style="color:var(--accent2);border:1px solid var(--border);border-radius:var(--radius);">
+      <span class="icon">👥</span>従業員管理台帳 ↗
+    </div>
+  </div>
+  <div class="sidebar-bottom"><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">v3.1.0</div></div>
 </nav>
 
 <!-- MOBILE BOTTOM NAV -->
@@ -287,7 +293,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <div class="mnav-item" onclick="navigate('sites')" data-page="sites"><div class="micon">📍</div><div class="mlabel">現場</div></div>
     <div class="mnav-item" onclick="navigate('contracts')" data-page="contracts"><div class="micon">📄</div><div class="mlabel">契約</div></div>
     <div class="mnav-item" onclick="navigate('billing')" data-page="billing"><div class="micon">💴</div><div class="mlabel">請求</div></div>
-    <div class="mnav-item" onclick="navigate('settings')" data-page="settings"><div class="micon">⚙️</div><div class="mlabel">設定</div></div>
+    <div class="mnav-item" onclick="window.open('jugyoin.html','_blank')"><div class="micon">👥</div><div class="mlabel">従業員</div></div>
   </div>
 </nav>
 
@@ -399,8 +405,8 @@ tr:hover td{background:rgba(255,255,255,.02);}
       <div class="form-group"><label class="form-label">企業名<span class="required">*</span></label><input type="text" class="form-input" id="c-name"></div>
       <div class="form-group"><label class="form-label">住所</label><input type="text" class="form-input" id="c-address"></div>
       <div class="form-row">
+        <div class="form-group"><label class="form-label">役職</label><input type="text" class="form-input" id="c-contact-person" placeholder="例：代表取締役、事業所長"></div>
         <div class="form-group"><label class="form-label">代表者名</label><input type="text" class="form-input" id="c-ceo"></div>
-        <div class="form-group"><label class="form-label">役職</label><input type="text" class="form-input" id="c-contact-person"></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">電話番号</label><input type="text" class="form-input" id="c-contact-phone"></div>
@@ -489,6 +495,17 @@ tr:hover td{background:rgba(255,255,255,.02);}
         <div class="form-group"><label class="form-label">電話番号</label><input type="text" class="form-input" id="s-haken-mgr-tel-site"></div>
       </div>
 
+      <!-- 業務内容 -->
+      <div class="form-section">
+        <div class="form-section-title">業務内容</div>
+        <div class="form-group"><label class="form-label">業務内容詳細</label><textarea class="form-textarea" id="s-job-detail" placeholder="できる限り詳細に記載してください"></textarea></div>
+        <div class="form-group"><label class="form-label">業務に伴う責任の程度</label><input type="text" class="form-input" id="s-authority" placeholder="例: 担当業務の範囲内での判断権限"></div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">時間外・休日労働ルール</label><input type="text" class="form-input" id="s-overtime" placeholder="例: 月20時間以内"></div>
+          <div class="form-group"><label class="form-label">就業日</label><input type="text" class="form-input" id="s-work-days" placeholder="例: 月〜金（土日祝休）"></div>
+        </div>
+      </div>
+
       <div class="form-group"><label class="form-label">安全及び衛生</label><textarea class="form-textarea" id="s-safety"></textarea></div>
       <div class="form-group"><label class="form-label">福祉増進のための便宜供与</label><textarea class="form-textarea" id="s-welfare"></textarea></div>
       <div class="form-group"><label class="form-label">備考</label><textarea class="form-textarea" id="s-notes-site"></textarea></div>
@@ -502,39 +519,27 @@ tr:hover td{background:rgba(255,255,255,.02);}
 
 <!-- 契約作成 -->
 <div class="modal-overlay" id="modal-contract">
-  <div class="modal modal-lg">
+  <div class="modal">
     <div class="modal-header"><h2 id="mct-title">契約を作成</h2><button class="btn btn-secondary btn-sm" onclick="closeModal('modal-contract')">✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="ct-id">
       <input type="hidden" id="ct-parent-id">
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">取引先 / 現場<span class="required">*</span></label><select class="form-select" id="ct-site-id"></select></div>
-        <div class="form-group"><label class="form-label">契約番号</label><input type="text" class="form-input" id="ct-no" placeholder="自動採番" readonly style="background:var(--bg);color:var(--text3);"></div>
+
+      <div class="form-group">
+        <label class="form-label">取引先 / 現場<span class="required">*</span></label>
+        <select class="form-select" id="ct-site-id"></select>
       </div>
+
       <div class="form-row">
         <div class="form-group"><label class="form-label">契約開始日<span class="required">*</span></label><input type="date" class="form-input" id="ct-start"></div>
         <div class="form-group"><label class="form-label">契約終了日<span class="required">*</span></label><input type="date" class="form-input" id="ct-end"></div>
       </div>
+
       <div class="form-row">
-        <div class="form-group"><label class="form-label">契約種別</label><select class="form-select" id="ct-type"><option value="">選択</option><option value="fixed_term">有期</option><option value="open_ended">無期</option></select></div>
-        <div class="form-group"><label class="form-label">更新回数</label><input type="number" class="form-input" id="ct-renewal" value="0" min="0"></div>
-      </div>
-      <div class="form-group"><label class="form-label">業務内容詳細</label><textarea class="form-textarea" id="ct-job-detail" placeholder="できる限り詳細に記載してください"></textarea></div>
-      <div class="form-group"><label class="form-label">業務に伴う責任の程度</label><input type="text" class="form-input" id="ct-authority" placeholder="例: 担当業務の範囲内での判断権限"></div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">時間外・休日労働ルール</label><input type="text" class="form-input" id="ct-overtime" placeholder="例: 月20時間以内"></div>
-        <div class="form-group"><label class="form-label">就業日</label><input type="text" class="form-input" id="ct-work-days" placeholder="例: 月〜金（土日祝休）"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">派遣料金</label><input type="text" class="form-input" id="ct-ryokin" placeholder="例: 2,500"></div>
-        <div class="form-group"><label class="form-label">料金単位</label><input type="text" class="form-input" id="ct-ryokin-tani" placeholder="例: 時間 / 月"></div>
-      </div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">事業所単位抵触日</label><input type="date" class="form-input" id="ct-jissai-date"></div>
-        <div class="form-group"><label class="form-label">組織単位抵触日</label><input type="date" class="form-input" id="ct-soshiki-date"></div>
+        <div class="form-group"><label class="form-label">派遣料金</label><input type="text" class="form-input" id="ct-ryokin" placeholder="例：2,500"></div>
+        <div class="form-group"><label class="form-label">料金単位</label><input type="text" class="form-input" id="ct-ryokin-tani" placeholder="例：時間 / 月"></div>
       </div>
 
-      <!-- スタッフ選択 -->
       <div class="form-group">
         <label class="form-label">配属スタッフ<span class="required">*</span></label>
         <div id="sel-emp-list" class="sel-emp-list"></div>
@@ -542,8 +547,14 @@ tr:hover td{background:rgba(255,255,255,.02);}
           <input type="text" class="form-input" id="ct-emp-search" placeholder="クリックで一覧表示 / 文字で絞り込み" onfocus="searchCEmp(this.value)" oninput="searchCEmp(this.value)" autocomplete="off">
           <div class="emp-dropdown" id="ct-emp-dd" style="display:none;"></div>
         </div>
-        <div style="font-size:11px;color:var(--text3);margin-top:4px;">複数名選択できます。各スタッフの雇用形態を設定してください。</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">複数名選択できます。</div>
       </div>
+
+      <div class="form-group">
+        <label class="form-label">契約番号</label>
+        <input type="text" class="form-input" id="ct-no" readonly style="background:var(--bg3);color:var(--text3);">
+      </div>
+
       <div class="form-group"><label class="form-label">備考</label><textarea class="form-textarea" id="ct-notes"></textarea></div>
     </div>
     <div class="modal-footer">
@@ -637,10 +648,13 @@ const {createClient} = supabase;
 const db    = createClient(SUPA_URL, SUPA_KEY);
 const empDb = createClient(EMP_URL,  EMP_KEY);
 
+// ===== XSS エスケープ =====
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');}
+
 // ===== STATE =====
 let ST = {clients:[],sites:[],contracts:[],billing:[],page:'dashboard',ctTab:'active'};
 let wpList=[], selEmps=[], empCache=null, empTimer=null;
-let currentDocContract = null; // 書類生成対象の契約データ
+let currentDocContract = null;
 
 // ===== LOGIN =====
 function checkLogin(){
@@ -687,18 +701,19 @@ function navigate(page){
 
 // ===== DASHBOARD =====
 async function loadDashboard(){
-  const [c,s,ct,ce]=await Promise.all([
+  const [c,s,ct,ce]=await Promise.allSettled([
     db.from('clients').select('id'),
     db.from('sites').select('id'),
     db.from('contracts').select('*').eq('status','active'),
     db.from('contract_employees').select('id').eq('is_active',true),
   ]);
-  document.getElementById('s-clients').textContent=(c.data||[]).length;
-  document.getElementById('s-sites').textContent=(s.data||[]).length;
-  document.getElementById('s-contracts').textContent=(ct.data||[]).length;
-  document.getElementById('s-staff').textContent=(ce.data||[]).length;
+  document.getElementById('s-clients').textContent=(c.status==='fulfilled'?(c.value.data||[]).length:'—');
+  document.getElementById('s-sites').textContent=(s.status==='fulfilled'?(s.value.data||[]).length:'—');
+  document.getElementById('s-contracts').textContent=(ct.status==='fulfilled'?(ct.value.data||[]).length:'—');
+  document.getElementById('s-staff').textContent=(ce.status==='fulfilled'?(ce.value.data||[]).length:'—');
   const today=new Date();
-  const expiring=(ct.data||[]).filter(x=>Math.ceil((new Date(x.contract_end)-today)/86400000)<=60);
+  const activeContracts=ct.status==='fulfilled'?(ct.value.data||[]):[];
+  const expiring=activeContracts.filter(x=>Math.ceil((new Date(x.contract_end)-today)/86400000)<=60);
   const exEl=document.getElementById('expiry-list');
   if(!expiring.length){exEl.innerHTML='<div class="empty-state"><div class="icon">✅</div><p>期限が近い契約はありません</p></div>';}
   else{
@@ -708,11 +723,11 @@ async function loadDashboard(){
     exEl.innerHTML=`<table><thead><tr><th>現場</th><th>取引先</th><th>終了日</th><th>残日数</th><th>操作</th></tr></thead><tbody>
       ${expiring.map(x=>{const si=sm[x.site_id];const d=Math.ceil((new Date(x.contract_end)-today)/86400000);const cls=d<=14?'expiry-expired':'expiry-near';
         return`<tr>
-          <td data-label="現場">${si?.name||'—'}</td>
-          <td data-label="取引先">${si?.clients?.name||'—'}</td>
-          <td data-label="終了日" class="${cls}">${x.contract_end}</td>
+          <td data-label="現場">${esc(si?.name||'—')}</td>
+          <td data-label="取引先">${esc(si?.clients?.name||'—')}</td>
+          <td data-label="終了日" class="${cls}">${esc(x.contract_end)}</td>
           <td data-label="残日数" class="${cls}">${d}日</td>
-          <td class="no-label"><button class="btn btn-warning btn-sm" onclick="openRenewalModal('${x.id}')">🔄 更新</button></td>
+          <td class="no-label"><button class="btn btn-warning btn-sm" onclick="openRenewalModal('${esc(x.id)}')">🔄 更新</button></td>
         </tr>`;
       }).join('')}</tbody></table>`;
   }
@@ -723,10 +738,10 @@ async function loadDashboard(){
     rcEl.innerHTML=`<table><thead><tr><th>契約番号</th><th>現場</th><th>取引先</th><th>期間</th><th>スタッフ</th><th>状態</th></tr></thead><tbody>
       ${recent.map(x=>{const cnt=(x.contract_employees||[]).filter(e=>e.is_active).length;
         return`<tr>
-          <td data-label="契約番号" style="font-family:'DM Mono',monospace;font-size:12px;">${x.contract_no||'—'}</td>
-          <td data-label="現場"><strong>${x.sites?.name||'—'}</strong></td>
-          <td data-label="取引先">${x.sites?.clients?.name||'—'}</td>
-          <td data-label="期間" style="font-family:'DM Mono',monospace;font-size:12px;">${x.contract_start}〜${x.contract_end}</td>
+          <td data-label="契約番号" style="font-family:'DM Mono',monospace;font-size:12px;">${esc(x.contract_no||'—')}</td>
+          <td data-label="現場"><strong>${esc(x.sites?.name||'—')}</strong></td>
+          <td data-label="取引先">${esc(x.sites?.clients?.name||'—')}</td>
+          <td data-label="期間" style="font-family:'DM Mono',monospace;font-size:12px;">${esc(x.contract_start)}〜${esc(x.contract_end)}</td>
           <td data-label="人数"><span class="badge badge-blue">${cnt}名</span></td>
           <td data-label="状態">${stBadge(x.status,x.contract_end)}</td>
         </tr>`;
@@ -761,17 +776,29 @@ function renderClients(list){
   const el=document.getElementById('clients-table');
   if(!list.length){el.innerHTML='<div class="empty-state"><div class="icon">🏢</div><p>取引先が登録されていません</p></div>';return;}
   el.innerHTML=`<table><thead><tr><th>企業名</th><th>担当者</th><th>電話番号</th><th>メール</th><th>操作</th></tr></thead><tbody>
-    ${list.map(c=>`<tr>
-      <td data-label="企業名"><strong>${c.name}</strong></td>
-      <td data-label="担当者">${c.contact_person||'—'}</td>
-      <td data-label="電話番号">${c.contact_phone||'—'}</td>
-      <td data-label="メール">${c.contact_email||'—'}</td>
+    ${list.map(c=>{
+      const name=esc(c.ceo||'');
+      const title=esc(c.contact_person||'');
+      let tantou='—';
+      if(name&&title) tantou=`<span style="font-size:11px;color:var(--text3);">${title}</span><br>${name}`;
+      else if(name) tantou=name;
+      else if(title) tantou=title;
+      return`<tr>
+      <td data-label="企業名"><strong>${esc(c.name)}</strong></td>
+      <td data-label="担当者">${tantou}</td>
+      <td data-label="電話番号">${esc(c.contact_phone||'—')}</td>
+      <td data-label="メール">${esc(c.contact_email||'—')}</td>
       <td class="no-label" style="display:flex;gap:6px;">
-        <button class="btn btn-secondary btn-sm" onclick='openClientModal(${JSON.stringify(c)})'>編集</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteClient('${c.id}')">削除</button>
-      </td></tr>`).join('')}</tbody></table>`;
+        <button class="btn btn-secondary btn-sm" onclick="openClientModalById('${esc(c.id)}')">編集</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteClient('${esc(c.id)}')">削除</button>
+      </td></tr>`;
+    }).join('')}</tbody></table>`;
 }
 function filterClients(){const q=document.getElementById('search-clients').value.toLowerCase();renderClients(ST.clients.filter(c=>c.name.toLowerCase().includes(q)));}
+function openClientModalById(id){
+  const c=ST.clients.find(x=>x.id===id);
+  openClientModal(c);
+}
 function openClientModal(c){
   document.getElementById('mc-title').textContent=c?'取引先を編集':'取引先を登録';
   document.getElementById('c-id').value=c?.id||'';document.getElementById('c-name').value=c?.name||'';
@@ -788,7 +815,7 @@ async function saveClient(){
     notes:document.getElementById('c-notes').value,updated_at:new Date().toISOString()};
   if(!p.name){toast('企業名を入力してください','error');return;}
   const {error}=id?await db.from('clients').update(p).eq('id',id):await db.from('clients').insert(p);
-  if(error){toast('保存に失敗しました','error');return;}
+  if(error){toast('保存に失敗：'+error.message,'error');return;}
   toast(id?'取引先を更新しました':'取引先を登録しました','success');
   closeModal('modal-client');loadClients();
 }
@@ -806,21 +833,25 @@ function renderSites(list){
   el.innerHTML=`<table><thead><tr><th>現場名</th><th>取引先</th><th>職種</th><th>指揮命令者</th><th>就業パターン</th><th>操作</th></tr></thead><tbody>
     ${list.map(s=>{
       const ps=s.work_patterns||[];
-      const ph=ps.length?ps.map(p=>`<div style="font-size:11px;">${p.pattern_name}：${p.start_time?.substring(0,5)}〜${p.end_time?.substring(0,5)}（休憩${p.break_minutes}分）</div>`).join(''):'<span style="color:var(--text3);font-size:11px;">未設定</span>';
+      const ph=ps.length?ps.map(p=>`<div style="font-size:11px;">${esc(p.pattern_name)}：${esc(p.start_time?.substring(0,5))}〜${esc(p.end_time?.substring(0,5))}（休憩${esc(String(p.break_minutes))}分）</div>`).join(''):'<span style="color:var(--text3);font-size:11px;">未設定</span>';
       return`<tr>
-        <td data-label="現場名"><strong>${s.name}</strong></td>
-        <td data-label="取引先">${s.clients?.name||'—'}</td>
-        <td data-label="職種">${s.job_type||'—'}</td>
-        <td data-label="指揮命令者">${s.supervisor||'—'}</td>
+        <td data-label="現場名"><strong>${esc(s.name)}</strong></td>
+        <td data-label="取引先">${esc(s.clients?.name||'—')}</td>
+        <td data-label="職種">${esc(s.job_type||'—')}</td>
+        <td data-label="指揮命令者">${esc(s.supervisor||'—')}</td>
         <td data-label="就業時間">${ph}</td>
         <td class="no-label" style="display:flex;gap:6px;">
-          <button class="btn btn-secondary btn-sm" onclick='openSiteModal(${JSON.stringify(s)})'>編集</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteSite('${s.id}')">削除</button>
+          <button class="btn btn-secondary btn-sm" onclick="openSiteModalById('${esc(s.id)}')">編集</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSite('${esc(s.id)}')">削除</button>
         </td></tr>`;
     }).join('')}</tbody></table>`;
 }
 function filterSites(){const q=document.getElementById('search-sites').value.toLowerCase();renderSites(ST.sites.filter(s=>s.name.toLowerCase().includes(q)||(s.clients?.name||'').toLowerCase().includes(q)));}
 
+async function openSiteModalById(id){
+  const site=ST.sites.find(x=>x.id===id);
+  await openSiteModal(site);
+}
 async function openSiteModal(site){
   document.getElementById('ms-title').textContent=site?'現場を編集':'現場を登録';
   const DEFAULT_SAFETY = `派遣先は、派遣労働者の安全衛生に関し、労働安全衛生法等関係法令を遵守し、必要な措置を講ずるものとする。
@@ -832,12 +863,13 @@ async function openSiteModal(site){
   const DEFAULT_WELFARE = `派遣先は、派遣労働者が利用できる福利厚生施設（給食施設・休憩室・更衣室）について、派遣先の労働者と同等の利用を認めるものとする。`;
 
   const fields={
-    's-id':'id','s-name':'name','s-address-site':'address','s-contact-person':'contact_person',
+    's-id':'id','s-name':'name','s-address-site':'address',
     's-supervisor':'supervisor','s-cmd-dept':'cmd_dept','s-cmd-title':'cmd_title','s-cmd-tel':'cmd_tel',
     's-job-type':'job_type','s-org-unit':'organization_unit','s-unit-mgr-title':'unit_manager_title',
     's-client-mgr-dept':'client_mgr_dept','s-client-mgr-title':'client_mgr_title','s-client-mgr-name':'client_mgr_name','s-client-mgr-tel':'client_mgr_tel',
     's-complaint-client-dept':'complaint_client_dept','s-complaint-client-title':'complaint_client_title','s-complaint-client-name':'complaint_client_name','s-complaint-client-tel':'complaint_client_tel',
     's-haken-mgr-dept-site':'haken_mgr_dept','s-haken-mgr-title-site':'haken_mgr_title','s-haken-mgr-name-site':'haken_mgr_name','s-haken-mgr-tel-site':'haken_mgr_tel',
+    's-job-detail':'job_detail','s-authority':'authority_detail','s-overtime':'overtime_rule','s-work-days':'work_days',
     's-notes-site':'notes',
   };
   Object.entries(fields).forEach(([elId,key])=>{ document.getElementById(elId).value=site?.[key]||''; });
@@ -873,7 +905,6 @@ async function saveSite(){
     client_id:document.getElementById('s-client-id').value,
     name:document.getElementById('s-name').value,
     address:document.getElementById('s-address-site').value,
-    contact_person:document.getElementById('s-contact-person').value,
     supervisor:document.getElementById('s-supervisor').value,
     cmd_dept:document.getElementById('s-cmd-dept').value,
     cmd_title:document.getElementById('s-cmd-title').value,
@@ -893,6 +924,10 @@ async function saveSite(){
     haken_mgr_title:document.getElementById('s-haken-mgr-title-site').value,
     haken_mgr_name:document.getElementById('s-haken-mgr-name-site').value,
     haken_mgr_tel:document.getElementById('s-haken-mgr-tel-site').value,
+    job_detail:document.getElementById('s-job-detail').value,
+    authority_detail:document.getElementById('s-authority').value,
+    overtime_rule:document.getElementById('s-overtime').value,
+    work_days:document.getElementById('s-work-days').value,
     safety_content:document.getElementById('s-safety').value,
     welfare_content:document.getElementById('s-welfare').value,
     notes:document.getElementById('s-notes-site').value,
@@ -931,19 +966,19 @@ function renderContracts(){
     ${list.map(x=>{
       const cnt=(x.contract_employees||[]).filter(e=>e.is_active).length;
       return`<tr>
-        <td data-label="契約番号" style="font-family:'DM Mono',monospace;font-size:12px;">${x.contract_no||'—'}</td>
-        <td data-label="現場"><strong>${x.sites?.name||'—'}</strong></td>
-        <td data-label="取引先">${x.sites?.clients?.name||'—'}</td>
-        <td data-label="期間" style="font-family:'DM Mono',monospace;font-size:12px;">${x.contract_start}〜${x.contract_end}</td>
+        <td data-label="契約番号" style="font-family:'DM Mono',monospace;font-size:12px;">${esc(x.contract_no||'—')}</td>
+        <td data-label="現場"><strong>${esc(x.sites?.name||'—')}</strong></td>
+        <td data-label="取引先">${esc(x.sites?.clients?.name||'—')}</td>
+        <td data-label="期間" style="font-family:'DM Mono',monospace;font-size:12px;">${esc(x.contract_start)}〜${esc(x.contract_end)}</td>
         <td data-label="人数"><span class="badge badge-blue">${cnt}名</span></td>
         <td data-label="状態">${stBadge(x.status,x.contract_end)}</td>
         <td class="no-label" style="display:flex;gap:4px;flex-wrap:wrap;">
-          <button class="btn btn-secondary btn-sm" onclick="openCtDetail('${x.id}')">詳細</button>
-          <button class="btn btn-secondary btn-sm" onclick="openContractModal('${x.id}')">編集</button>
-          <button class="btn btn-purple btn-sm" onclick="openDocsModal('${x.id}')">📄 書類</button>
-          ${x.status==='active'?`<button class="btn btn-warning btn-sm" onclick="openRenewalModal('${x.id}')">🔄 更新</button>`:''}
-          ${x.status==='active'?`<button class="btn btn-danger btn-sm" onclick="endContract('${x.id}')">終了</button>`:''}
-          <button class="btn btn-danger btn-sm" onclick="deleteContract('${x.id}')">削除</button>
+          <button class="btn btn-secondary btn-sm" onclick="openCtDetail('${esc(x.id)}')">詳細</button>
+          <button class="btn btn-secondary btn-sm" onclick="openContractModal('${esc(x.id)}')">編集</button>
+          <button class="btn btn-purple btn-sm" onclick="openDocsModal('${esc(x.id)}')">📄 書類</button>
+          ${x.status==='active'?`<button class="btn btn-warning btn-sm" onclick="openRenewalModal('${esc(x.id)}')">🔄 更新</button>`:''}
+          ${x.status==='active'?`<button class="btn btn-danger btn-sm" onclick="endContract('${esc(x.id)}')">終了</button>`:''}
+          <button class="btn btn-danger btn-sm" onclick="deleteContract('${esc(x.id)}')">削除</button>
         </td></tr>`;
     }).join('')}</tbody></table>`;
 }
@@ -957,10 +992,10 @@ async function openCtDetail(cid){
   document.getElementById('ctd-title').textContent=`契約詳細：${c.contract_no||c.sites?.name||''}`;
   document.getElementById('ctd-body').innerHTML=`
     <div class="ct-header">
-      <div class="ct-item"><div class="ct-lbl">契約番号</div><div class="ct-val" style="font-family:'DM Mono',monospace;">${c.contract_no||'—'}</div></div>
-      <div class="ct-item"><div class="ct-lbl">取引先</div><div class="ct-val"><strong>${c.sites?.clients?.name||'—'}</strong></div></div>
-      <div class="ct-item"><div class="ct-lbl">現場</div><div class="ct-val"><strong>${c.sites?.name||'—'}</strong></div></div>
-      <div class="ct-item"><div class="ct-lbl">契約期間</div><div class="ct-val">${c.contract_start} 〜 ${c.contract_end}</div></div>
+      <div class="ct-item"><div class="ct-lbl">契約番号</div><div class="ct-val" style="font-family:'DM Mono',monospace;">${esc(c.contract_no||'—')}</div></div>
+      <div class="ct-item"><div class="ct-lbl">取引先</div><div class="ct-val"><strong>${esc(c.sites?.clients?.name||'—')}</strong></div></div>
+      <div class="ct-item"><div class="ct-lbl">現場</div><div class="ct-val"><strong>${esc(c.sites?.name||'—')}</strong></div></div>
+      <div class="ct-item"><div class="ct-lbl">契約期間</div><div class="ct-val">${esc(c.contract_start)} 〜 ${esc(c.contract_end)}</div></div>
       <div class="ct-item"><div class="ct-lbl">状態</div><div class="ct-val">${stBadge(c.status,c.contract_end)}</div></div>
       <div class="ct-item"><div class="ct-lbl">更新回数</div><div class="ct-val">${c.renewal_count||0}回</div></div>
     </div>
@@ -968,20 +1003,21 @@ async function openCtDetail(cid){
     <div class="emp-card-grid">
       ${(c.contract_employees||[]).map(e=>`
         <div class="emp-card">
-          <h4>👤 ${enames[e.employee_id]||'（氏名取得中）'}</h4>
+          <h4>👤 ${esc(enames[e.employee_id]||'（氏名取得中）')}</h4>
           <div style="font-size:12px;color:var(--text3);">雇用形態：<span style="color:var(--text);">${e.employment_type==='permanent'?'無期契約':'有期契約'}</span></div>
           <div style="font-size:11px;color:var(--text3);margin-top:4px;font-family:'DM Mono',monospace;">従業員ID: ${e.employee_id}</div>
+          <button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%;" onclick="window.open('jugyoin.html','_blank')" title="従業員管理台帳で確認">従業員台帳で確認 ↗</button>
         </div>`).join('')}
     </div>
-    ${c.job_detail?`<div style="margin-top:8px;"><div style="font-size:11px;color:var(--text3);">業務内容</div><div style="font-size:13px;margin-top:4px;">${c.job_detail}</div></div>`:''}
-    ${c.notes?`<div class="alert alert-info" style="margin-top:12px;">📝 ${c.notes}</div>`:''}`;
+    ${c.job_detail?`<div style="margin-top:8px;"><div style="font-size:11px;color:var(--text3);">業務内容</div><div style="font-size:13px;margin-top:4px;">${esc(c.job_detail)}</div></div>`:''}
+    ${c.notes?`<div class="alert alert-info" style="margin-top:12px;">📝 ${esc(c.notes)}</div>`:''}`;
   document.getElementById('ctd-footer').innerHTML=`
     <button class="btn btn-secondary" onclick="closeModal('modal-ct-detail')">閉じる</button>
-    <button class="btn btn-secondary" onclick="closeModal('modal-ct-detail');openContractModal('${c.id}')">✏️ 編集</button>
-    <button class="btn btn-purple" onclick="closeModal('modal-ct-detail');openDocsModal('${c.id}')">📄 書類を生成</button>
-    ${c.status==='active'?`<button class="btn btn-warning" onclick="closeModal('modal-ct-detail');openRenewalModal('${c.id}')">🔄 契約を更新</button>`:''}
-    ${c.status==='active'?`<button class="btn btn-danger" onclick="closeModal('modal-ct-detail');endContract('${c.id}')">契約を終了</button>`:''}
-    <button class="btn btn-danger" onclick="closeModal('modal-ct-detail');deleteContract('${c.id}')">🗑 削除</button>`;
+    <button class="btn btn-secondary" onclick="closeModal('modal-ct-detail');openContractModal('${esc(c.id)}')">✏️ 編集</button>
+    <button class="btn btn-purple" onclick="closeModal('modal-ct-detail');openDocsModal('${esc(c.id)}')">📄 書類を生成</button>
+    ${c.status==='active'?`<button class="btn btn-warning" onclick="closeModal('modal-ct-detail');openRenewalModal('${esc(c.id)}')">🔄 契約を更新</button>`:''}
+    ${c.status==='active'?`<button class="btn btn-danger" onclick="closeModal('modal-ct-detail');endContract('${esc(c.id)}')">契約を終了</button>`:''}
+    <button class="btn btn-danger" onclick="closeModal('modal-ct-detail');deleteContract('${esc(c.id)}')">🗑 削除</button>`;
   openModal('modal-ct-detail');
 }
 
@@ -1012,10 +1048,11 @@ async function searchCEmp(q){
     const filtered=(!q?empCache:empCache.filter(e=>(e.sei||'').toLowerCase().includes(q.toLowerCase())||(e.mei||'').toLowerCase().includes(q.toLowerCase())||(e.seikana||'').includes(q)||(e.meikana||'').includes(q))).filter(e=>!used.includes(e.id));
     if(!filtered.length){dd.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--text3);">該当なし</div>';return;}
     dd.innerHTML=filtered.map(e=>{
-      const name=`${e.sei} ${e.mei}`;const kana=`${e.seikana||''} ${e.meikana||''}`.trim();
+      const name=`${esc(e.sei)} ${esc(e.mei)}`;const kana=`${esc(e.seikana||'')} ${esc(e.meikana||'')}`.trim();
       const etLabel=e.employment_type==='permanent'?'無期':'有期';
       const etColor=e.employment_type==='permanent'?'var(--success)':'var(--accent2)';
-      return`<div class="emp-option" onclick="addSelEmp(${e.id},'${name.replace(/'/g,"\\'")}','${e.employment_type||'fixed'}')">
+      const safeName=`${e.sei} ${e.mei}`.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      return`<div class="emp-option" onclick="addSelEmp(${e.id},'${safeName}','${e.employment_type||'fixed'}')">
         <div><div style="font-weight:500;">${name}</div>${kana?`<div style="font-size:11px;color:var(--text3);">${kana}</div>`:''}</div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span style="font-size:11px;color:${etColor};font-weight:600;">${etLabel}</span>
@@ -1038,7 +1075,7 @@ function renderSelEmps(){
     const etLabel=e.employment_type==='permanent'?'無期契約':'有期契約';
     const etColor=e.employment_type==='permanent'?'var(--success)':'var(--accent2)';
     return`<div class="sel-emp-item">
-      <span class="sname">👤 ${e.name}</span>
+      <span class="sname">👤 ${esc(e.name)}</span>
       <div style="display:flex;align-items:center;gap:8px;">
         <span style="font-size:12px;font-weight:600;color:${etColor};">${etLabel}</span>
         <span style="font-size:11px;color:var(--text3);">（従業員台帳から取得）</span>
@@ -1049,7 +1086,6 @@ function renderSelEmps(){
 }
 
 async function openContractModal(cid){
-  // 編集モード：既存契約IDが渡された場合はDBから取得
   let existing = null;
   if(cid){
     const {data}=await db.from('contracts').select('*,contract_employees(*)').eq('id',cid).single();
@@ -1062,19 +1098,10 @@ async function openContractModal(cid){
   document.getElementById('ct-no').value=existing?.contract_no||(await generateContractNo());
   document.getElementById('ct-start').value=existing?.contract_start||'';
   document.getElementById('ct-end').value=existing?.contract_end||'';
-  document.getElementById('ct-type').value=existing?.contract_type||'';
-  document.getElementById('ct-renewal').value=existing?.renewal_count||0;
-  document.getElementById('ct-job-detail').value=existing?.job_detail||'';
-  document.getElementById('ct-authority').value=existing?.authority_detail||'';
-  document.getElementById('ct-overtime').value=existing?.overtime_rule||'';
-  document.getElementById('ct-work-days').value=existing?.work_days||'';
   document.getElementById('ct-ryokin').value=existing?.haken_ryokin||'';
   document.getElementById('ct-ryokin-tani').value=existing?.ryokin_tani||'';
-  document.getElementById('ct-jissai-date').value=existing?.jissai_shokuchoku_date||'';
-  document.getElementById('ct-soshiki-date').value=existing?.soshiki_shokuchoku_date||'';
   document.getElementById('ct-notes').value=existing?.notes||'';
 
-  // スタッフ選択：編集時は既存スタッフを復元
   selEmps=[];empCache=null;
   if(existing?.contract_employees?.length){
     const empIds=existing.contract_employees.map(e=>e.employee_id);
@@ -1093,10 +1120,9 @@ async function openContractModal(cid){
   document.getElementById('ct-emp-dd').style.display='none';
   document.getElementById('ct-emp-search').value='';
 
-  // 現場リスト
   const {data:sites}=await db.from('sites').select('id,name,clients(name)').order('name');
   document.getElementById('ct-site-id').innerHTML=(sites||[]).map(s=>
-    `<option value="${s.id}" ${s.id===existing?.site_id?'selected':''}>${s.clients?.name||''} / ${s.name}</option>`
+    `<option value="${s.id}" ${s.id===existing?.site_id?'selected':''}>${esc(s.clients?.name||'')} / ${esc(s.name)}</option>`
   ).join('');
 
   openModal('modal-contract');
@@ -1105,33 +1131,33 @@ async function openContractModal(cid){
 async function saveContract(){
   const id=document.getElementById('ct-id').value;
   if(!selEmps.length){toast('スタッフを1名以上選択してください','error');return;}
+  const siteId=document.getElementById('ct-site-id').value;
+  if(!siteId){toast('取引先 / 現場を選択してください','error');return;}
+
+  // 現場から業務内容等を引き継ぐ
+  const site=ST.sites.find(s=>s.id===siteId);
   const p={
-    site_id:document.getElementById('ct-site-id').value,
+    site_id:siteId,
     contract_no:document.getElementById('ct-no').value,
     contract_start:document.getElementById('ct-start').value,
     contract_end:document.getElementById('ct-end').value,
-    contract_type:document.getElementById('ct-type').value||null,
-    renewal_count:parseInt(document.getElementById('ct-renewal').value)||0,
-    job_detail:document.getElementById('ct-job-detail').value,
-    authority_detail:document.getElementById('ct-authority').value,
-    overtime_rule:document.getElementById('ct-overtime').value,
-    work_days:document.getElementById('ct-work-days').value,
     haken_ryokin:document.getElementById('ct-ryokin').value,
     ryokin_tani:document.getElementById('ct-ryokin-tani').value,
-    jissai_shokuchoku_date:document.getElementById('ct-jissai-date').value||null,
-    soshiki_shokuchoku_date:document.getElementById('ct-soshiki-date').value||null,
+    job_detail:site?.job_detail||'',
+    authority_detail:site?.authority_detail||'',
+    overtime_rule:site?.overtime_rule||'',
+    work_days:site?.work_days||'',
     notes:document.getElementById('ct-notes').value,
     parent_contract_id:document.getElementById('ct-parent-id').value||null,
     status:'active',updated_at:new Date().toISOString(),
   };
-  if(!p.site_id||!p.contract_start||!p.contract_end){toast('必須項目を入力してください','error');return;}
+  if(!p.contract_start||!p.contract_end){toast('契約期間を入力してください','error');return;}
   let cid=id;
   if(id){await db.from('contracts').update(p).eq('id',id);}
   else{const {data,error}=await db.from('contracts').insert(p).select('id').single();if(error){toast('保存に失敗しました','error');return;}cid=data.id;}
   await db.from('contract_employees').delete().eq('contract_id',cid);
   await db.from('contract_employees').insert(selEmps.map(e=>({contract_id:cid,employee_id:e.id,employment_type:e.employment_type,is_active:true})));
 
-  // 従業員管理台帳のdispatch_contractsに同期
   await syncDispatchContracts(cid, p.contract_start, p.contract_end, p.contract_no);
 
   toast('契約を保存しました','success');closeModal('modal-contract');loadContracts();
@@ -1146,7 +1172,7 @@ async function openRenewalModal(cid){
   const empIds=(c.contract_employees||[]).map(e=>e.employee_id);
   let enames={};
   if(empIds.length){const {data:emps}=await empDb.from('employees').select('id,sei,mei').in('id',empIds);(emps||[]).forEach(e=>enames[e.id]=`${e.sei} ${e.mei}`);}
-  document.getElementById('rn-info').innerHTML=`<strong>現場：</strong>${c.sites?.name||'—'}<br><span style="color:var(--text3);font-size:12px;">配属：${(c.contract_employees||[]).map(e=>enames[e.employee_id]||`ID:${e.employee_id}`).join('、')}</span>`;
+  document.getElementById('rn-info').innerHTML=`<strong>現場：</strong>${esc(c.sites?.name||'—')}<br><span style="color:var(--text3);font-size:12px;">配属：${(c.contract_employees||[]).map(e=>esc(enames[e.employee_id]||`ID:${e.employee_id}`)).join('、')}</span>`;
   const fixed=(c.contract_employees||[]).filter(e=>e.employment_type==='fixed');
   document.getElementById('rn-emp-opts').innerHTML=fixed.length
     ?fixed.map(e=>`<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;"><input type="checkbox" checked id="rn-${e.employee_id}">${enames[e.employee_id]||`ID:${e.employee_id}`}（有期）の雇用契約書を更新する</label>`).join('')
@@ -1593,17 +1619,21 @@ async function loadBilling(){
   const total=ST.billing.reduce((s,b)=>s+(b.amount||0),0);
   el.innerHTML=`<table><thead><tr><th>取引先</th><th>対象月</th><th>金額</th><th>状態</th><th>備考</th><th>操作</th></tr></thead><tbody>
     ${ST.billing.map(b=>`<tr>
-      <td data-label="取引先"><strong>${b.clients?.name||'—'}</strong></td>
-      <td data-label="対象月">${b.billing_month?.substring(0,7)}</td>
+      <td data-label="取引先"><strong>${esc(b.clients?.name||'—')}</strong></td>
+      <td data-label="対象月">${esc(b.billing_month?.substring(0,7)||'—')}</td>
       <td data-label="金額" style="font-family:'DM Mono',monospace;">${(b.amount||0).toLocaleString('ja-JP')}円</td>
       <td data-label="状態">${b.is_billed?'<span class="badge badge-green">請求済み</span>':'<span class="badge badge-yellow">未請求</span>'}</td>
-      <td data-label="備考">${b.notes||'—'}</td>
+      <td data-label="備考">${esc(b.notes||'—')}</td>
       <td class="no-label" style="display:flex;gap:6px;">
-        <button class="btn btn-secondary btn-sm" onclick='openBillingModal(${JSON.stringify(b)})'>編集</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteBilling('${b.id}')">削除</button>
+        <button class="btn btn-secondary btn-sm" onclick="openBillingModalById('${esc(b.id)}')">編集</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteBilling('${esc(b.id)}')">削除</button>
       </td></tr>`).join('')}
     <tr style="background:rgba(59,130,246,.05);"><td colspan="2"><strong>合計</strong></td><td colspan="4" style="font-family:'DM Mono',monospace;font-weight:700;color:var(--accent2);">${total.toLocaleString('ja-JP')}円</td></tr>
     </tbody></table>`;
+}
+async function openBillingModalById(id){
+  const b=ST.billing.find(x=>x.id===id);
+  await openBillingModal(b);
 }
 async function openBillingModal(b){
   document.getElementById('mb-title').textContent=b?'請求を編集':'請求を記録';
