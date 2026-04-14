@@ -5,8 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>派遣管理台帳</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://unpkg.com/docx@8.5.0/build/index.min.js"></script>
-<script src="https://unpkg.com/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+<script>
+// docxライブラリを動的に読み込み、確実にグローバルに展開する
+(function(){
+  function loadScript(url, cb){
+    const s=document.createElement('script');
+    s.src=url;s.onload=cb;s.onerror=function(){cb(new Error('load failed:'+url));};
+    document.head.appendChild(s);
+  }
+  window._docxReady=false;
+  loadScript('https://unpkg.com/docx@8.5.0/build/index.min.js',function(err){
+    if(!err&&(window.docx||typeof docx!=='undefined')){window._docxReady=true;return;}
+    // フォールバック：jsDelivr
+    loadScript('https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.min.js',function(err2){
+      if(!err2)window._docxReady=true;
+    });
+  });
+  loadScript('https://unpkg.com/file-saver@2.0.5/dist/FileSaver.min.js',function(){});
+})();
+</script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
 :root{--bg:#0f1117;--bg2:#161b27;--bg3:#1e2535;--border:#2a3347;--accent:#3b82f6;--accent2:#60a5fa;--success:#22c55e;--warning:#f59e0b;--danger:#ef4444;--text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;--radius:8px;}
@@ -1366,8 +1383,13 @@ function replacePlaceholders(text, ph){
 // テンプレートテキストからdocxを生成（シンプルなテキスト版）
 async function createSimpleDocx(title, bodyText, filename){
   try{
-    const docxLib = window.docx || docx;
-    if(!docxLib) throw new Error('docxライブラリが読み込まれていません。ページを再読み込みしてください。');
+    // docxライブラリのグローバル名を複数パターンで探す
+    const docxLib = window.docx || window.DOCX || window.Docx
+      || (typeof docx!=='undefined'?docx:null)
+      || (typeof DOCX!=='undefined'?DOCX:null);
+    if(!docxLib||!docxLib.Document){
+      throw new Error('docxライブラリが読み込まれていません。ページを再読み込みしてください。');
+    }
     const {Document,Packer,Paragraph,TextRun,AlignmentType}=docxLib;
     const lines=bodyText.split('\n');
     const children=[
