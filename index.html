@@ -580,6 +580,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
         <div class="form-group"><label class="form-label">締結日</label><input type="date" class="form-input" id="ct-contract-date"></div>
         <div class="form-group"></div>
       </div>
+      </div>
 
       <div class="form-row">
         <div class="form-group"><label class="form-label">派遣料金</label><input type="text" class="form-input" id="ct-ryokin" placeholder="例：2,500"></div>
@@ -1295,11 +1296,11 @@ async function syncDispatchContracts(contractId, startDate, endDate, contractNo)
 
 // ===== DOCS MODAL =====
 async function openDocsModal(cid){
-  const {data:c}=await db.from('contracts').select('*,sites(*,clients(*)),contract_employees(*)').eq('id',cid).single();
+  const {data:c}=await db.from('contracts').select('*,sites(*,clients(*),work_patterns(*)),contract_employees(*)').eq('id',cid).single();
   if(!c)return;
-  // work_patternsを別途取得
-  if(c.sites?.id){
-    const {data:wp}=await db.from('work_patterns').select('*').eq('site_id',c.sites.id).order('created_at').limit(1);
+  // work_patternsが取得できていない場合は別途取得
+  if(c.sites?.id && (!c.sites.work_patterns || c.sites.work_patterns.length===0)){
+    const {data:wp}=await db.from('work_patterns').select('*').eq('site_id',c.sites.id).order('created_at');
     c.sites.work_patterns=wp||[];
   }
   currentDocContract=c;
@@ -1352,6 +1353,9 @@ function toWareki(dateStr){
 function buildPlaceholders(c, emp, settings){
   const site=c.sites||{};const client=site.clients||{};
   const wp=(site.work_patterns||[])[0]||{};
+  const workStart=wp.start_time?wp.start_time.substring(0,5):'';
+  const workEnd=wp.end_time?wp.end_time.substring(0,5):'';
+  const breakMin=wp.break_minutes;
   const today=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'});
   // 有期スタッフが1人でもいるか判定
   const hasKiki=(c.contract_employees||[]).some(e=>e.employment_type!=='permanent');
@@ -1363,9 +1367,9 @@ function buildPlaceholders(c, emp, settings){
     DISPATCH_START: v(c.contract_start),
     DISPATCH_END: v(c.contract_end),
     WORK_DAYS: v(c.work_days),
-    WORK_START: wp.start_time?wp.start_time.substring(0,5):'',
-    WORK_END: wp.end_time?wp.end_time.substring(0,5):'',
-    BREAK_TIME: wp.break_minutes?`${wp.break_minutes}分`:'',
+    WORK_START: workStart,
+    WORK_END: workEnd,
+    BREAK_TIME: breakMin?`${breakMin}分`:'',
     JOB_DETAIL: v(c.job_detail),
     AUTHORITY_DETAIL: v(c.authority_detail),
     OVERTIME_RULE: v(c.overtime_rule),
