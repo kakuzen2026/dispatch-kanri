@@ -272,6 +272,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
   <div class="nav-section">
     <div class="nav-section-label">管理</div>
     <div class="nav-item" onclick="navigate('billing')"><span class="icon">💴</span>請求管理</div>
+    <div class="nav-item" onclick="navigate('records')"><span class="icon">📋</span>記録管理</div>
     <div class="nav-item" onclick="navigate('settings')"><span class="icon">⚙️</span>設定</div>
   </div>
   <div class="nav-section" style="margin-top:auto;">
@@ -291,6 +292,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <div class="mnav-item" onclick="navigate('sites')" data-page="sites"><div class="micon">📍</div><div class="mlabel">現場</div></div>
     <div class="mnav-item" onclick="navigate('contracts')" data-page="contracts"><div class="micon">📄</div><div class="mlabel">契約</div></div>
     <div class="mnav-item" onclick="navigate('billing')" data-page="billing"><div class="micon">💴</div><div class="mlabel">請求</div></div>
+    <div class="mnav-item" onclick="navigate('records')" data-page="records"><div class="micon">📋</div><div class="mlabel">記録</div></div>
     <div class="mnav-item" onclick="window.open('jugyoin.html','_blank')"><div class="micon">👥</div><div class="mlabel">従業員</div></div>
   </div>
 </nav>
@@ -348,6 +350,11 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <div class="page" id="page-billing">
       <div class="section-header"><select class="form-select" id="billing-month-filter" onchange="loadBilling()" style="width:160px;"></select></div>
       <div class="card" style="padding:0;overflow:hidden;"><div id="billing-table"><div class="loading"><div class="spinner"></div>読み込み中...</div></div></div>
+    </div>
+
+    <!-- 記録管理 -->
+    <div class="page" id="page-records">
+      <div id="mainContent-records"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
     </div>
 
     <!-- 設定 -->
@@ -620,6 +627,45 @@ tr:hover td{background:rgba(255,255,255,.02);}
   </div>
 </div>
 
+
+<!-- 記録入力モーダル -->
+<div class="modal-overlay" id="modal-record-edit">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h2 id="rec-modal-title">📋 記録を追加</h2>
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('modal-record-edit')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="rec-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">記録種別<span class="required">*</span></label>
+          <select class="form-select" id="rec-type" onchange="renderRecTypeFields()">
+            <option value="complaint">苦情処理</option>
+            <option value="training">教育訓練</option>
+            <option value="stability">雇用安定措置</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">従業員<span class="required">*</span></label>
+          <select class="form-select" id="rec-emp-id"></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">関連契約（案件）</label>
+        <select class="form-select" id="rec-contract-id">
+          <option value="">選択しない</option>
+        </select>
+      </div>
+      <div id="rec-type-fields"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-record-edit')">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveEmployeeRecord()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- 書類生成 -->
 <div class="modal-overlay" id="modal-docs">
   <div class="modal modal-lg">
@@ -721,7 +767,7 @@ function doLogin(){
 function showApp(){loadDashboard();}
 
 // ===== NAV =====
-const NAV_TITLES={dashboard:'ダッシュボード',clients:'取引先管理',sites:'現場管理',contracts:'契約管理',billing:'請求管理',settings:'設定'};
+const NAV_TITLES={dashboard:'ダッシュボード',clients:'取引先管理',sites:'現場管理',contracts:'契約管理',billing:'請求管理',records:'記録管理',settings:'設定'};
 const NAV_BTNS={
   clients:`<button class="btn btn-primary" onclick="openClientModal()">＋ <span class="btn-text">取引先を登録</span></button>`,
   sites:`<button class="btn btn-primary" onclick="openSiteModal()">＋ <span class="btn-text">現場を登録</span></button>`,
@@ -743,6 +789,7 @@ function navigate(page){
   else if(page==='sites') loadSites();
   else if(page==='contracts') loadContracts();
   else if(page==='billing'){initBillingMonths();loadBilling();}
+  else if(page==='records') loadRecords();
   else if(page==='settings') loadSettings();
 }
 
@@ -1295,6 +1342,169 @@ async function syncDispatchContracts(contractId, startDate, endDate, contractNo)
 }
 
 // ===== DOCS MODAL =====
+// ===== RECORDS MANAGEMENT =====
+async function loadRecords(){
+  const [recRes, empRes, ctRes] = await Promise.all([
+    db.from('employee_records').select('*').order('rec_date',{ascending:false}),
+    empDb.from('employees').select('id,sei,mei').order('sei'),
+    db.from('contracts').select('id,contract_no,sites(name,clients(name))').order('contract_no')
+  ]);
+  const records = recRes.data||[];
+  const emps = empRes.data||[];
+  const cts = ctRes.data||[];
+
+  const empMap = {};
+  emps.forEach(e=>empMap[e.id]=`${e.sei} ${e.mei}`);
+  const ctMap = {};
+  cts.forEach(c=>ctMap[c.id]=`${c.contract_no||'—'} ${c.sites?.clients?.name||''} / ${c.sites?.name||''}`);
+
+  const typeLabel = {complaint:'苦情処理', training:'教育訓練', stability:'雇用安定措置'};
+  const typeColor = {complaint:'var(--danger)', training:'var(--accent)', stability:'var(--success)'};
+
+  document.getElementById('mainContent-records').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h2 style="font-size:16px;font-weight:600;">記録管理</h2>
+      <button class="btn btn-primary" onclick="openRecordModal()">＋ 記録を追加</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+      <select class="form-select" style="width:160px;" id="rec-filter-type" onchange="loadRecords()">
+        <option value="">すべての種別</option>
+        <option value="complaint">苦情処理</option>
+        <option value="training">教育訓練</option>
+        <option value="stability">雇用安定措置</option>
+      </select>
+      <select class="form-select" style="width:200px;" id="rec-filter-emp" onchange="loadRecords()">
+        <option value="">すべての従業員</option>
+        ${emps.map(e=>`<option value="${e.id}">${e.sei} ${e.mei}</option>`).join('')}
+      </select>
+    </div>
+    <div id="rec-list">
+      ${records.length===0?'<div style="text-align:center;color:var(--text3);padding:40px;">記録がありません</div>':''}
+      ${records.map(r=>`
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <span style="background:${typeColor[r.type]||'var(--accent)'};color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">${typeLabel[r.type]||r.type}</span>
+              <span style="font-weight:600;font-size:13px;">${esc(empMap[r.employee_id]||`ID:${r.employee_id}`)}</span>
+              ${r.contract_id?`<span style="font-size:11px;color:var(--text3);">📄 ${esc(ctMap[r.contract_id]||r.contract_id)}</span>`:''}
+              ${r.rec_date?`<span style="font-size:11px;color:var(--text3);">${r.rec_date.substring(0,10)}</span>`:''}
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="deleteEmployeeRecord('${r.id}')">削除</button>
+          </div>
+          <div style="margin-top:8px;font-size:12px;color:var(--text2);white-space:pre-wrap;">${esc(r.content||'')}</div>
+          ${r.result?`<div style="margin-top:4px;font-size:12px;color:var(--text3);">処理結果：${esc(r.result)}</div>`:''}
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+function renderRecTypeFields(){
+  const type = document.getElementById('rec-type').value;
+  let html = '';
+  if(type==='complaint'){
+    html = `
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">申出を受けた日</label><input type="date" class="form-input" id="rec-date"></div>
+        <div class="form-group"></div>
+      </div>
+      <div class="form-group"><label class="form-label">苦情内容<span class="required">*</span></label><textarea class="form-textarea" id="rec-content" rows="3"></textarea></div>
+      <div class="form-group"><label class="form-label">処理状況・結果</label><textarea class="form-textarea" id="rec-result" rows="3"></textarea></div>`;
+  } else if(type==='training'){
+    html = `
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">実施日時</label><input type="datetime-local" class="form-input" id="rec-date"></div>
+        <div class="form-group"></div>
+      </div>
+      <div class="form-group"><label class="form-label">教育訓練内容<span class="required">*</span></label><textarea class="form-textarea" id="rec-content" rows="4"></textarea></div>`;
+  } else if(type==='stability'){
+    html = `
+      <div class="form-group"><label class="form-label">希望する雇用安定措置の内容</label><textarea class="form-textarea" id="rec-hope" rows="2"></textarea></div>
+      <div class="form-section" style="margin-top:12px;">
+        <div class="form-section-title">①派遣先への直接雇用の依頼</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">依頼日時・方法</label><input type="text" class="form-input" id="rec-direct-req"></div>
+          <div class="form-group"><label class="form-label">派遣先の回答日時・内容</label><input type="text" class="form-input" id="rec-direct-ans"></div>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">②他の派遣先の紹介</label><textarea class="form-textarea" id="rec-other" rows="2"></textarea></div>
+      <div class="form-group"><label class="form-label">③期間を定めない雇用の機会の確保</label><textarea class="form-textarea" id="rec-mukirogen" rows="2"></textarea></div>
+      <div class="form-group"><label class="form-label">④その他</label><textarea class="form-textarea" id="rec-etc" rows="2"></textarea></div>`;
+  }
+  document.getElementById('rec-type-fields').innerHTML = html;
+}
+
+async function openRecordModal(record=null){
+  document.getElementById('rec-id').value = record?.id||'';
+  document.getElementById('rec-modal-title').textContent = record ? '📋 記録を編集' : '📋 記録を追加';
+  // 従業員リスト
+  const {data:emps}=await empDb.from('employees').select('id,sei,mei').order('sei');
+  document.getElementById('rec-emp-id').innerHTML=(emps||[]).map(e=>`<option value="${e.id}" ${record?.employee_id===e.id?'selected':''}>${e.sei} ${e.mei}</option>`).join('');
+  // 契約リスト
+  const {data:cts}=await db.from('contracts').select('id,contract_no,sites(name,clients(name))').order('contract_no');
+  document.getElementById('rec-contract-id').innerHTML=`<option value="">選択しない</option>`+(cts||[]).map(c=>`<option value="${c.id}" ${record?.contract_id===c.id?'selected':''}>${c.contract_no||'—'} ${c.sites?.clients?.name||''} / ${c.sites?.name||''}</option>`).join('');
+  // 種別セット
+  if(record) document.getElementById('rec-type').value=record.type;
+  renderRecTypeFields();
+  // 既存データ復元
+  if(record){
+    if(document.getElementById('rec-date')) document.getElementById('rec-date').value=record.rec_date||'';
+    if(record.type==='stability'){
+      try{const d=JSON.parse(record.content||'{}');
+        document.getElementById('rec-hope').value=d.hope||'';
+        document.getElementById('rec-direct-req').value=d.direct_req||'';
+        document.getElementById('rec-direct-ans').value=d.direct_ans||'';
+        document.getElementById('rec-other').value=d.other||'';
+        document.getElementById('rec-mukirogen').value=d.mukirogen||'';
+        document.getElementById('rec-etc').value=d.etc||'';
+      }catch(e){}
+    } else {
+      if(document.getElementById('rec-content')) document.getElementById('rec-content').value=record.content||'';
+      if(document.getElementById('rec-result')) document.getElementById('rec-result').value=record.result||'';
+    }
+  }
+  openModal('modal-record-edit');
+}
+
+async function saveEmployeeRecord(){
+  const id = document.getElementById('rec-id').value;
+  const empId = document.getElementById('rec-emp-id').value;
+  const contractId = document.getElementById('rec-contract-id').value||null;
+  const type = document.getElementById('rec-type').value;
+  if(!empId){toast('従業員を選択してください','error');return;}
+  let p={employee_id:empId,contract_id:contractId,type,updated_at:new Date().toISOString()};
+  if(type==='stability'){
+    p.content=JSON.stringify({
+      hope:document.getElementById('rec-hope')?.value||'',
+      direct_req:document.getElementById('rec-direct-req')?.value||'',
+      direct_ans:document.getElementById('rec-direct-ans')?.value||'',
+      other:document.getElementById('rec-other')?.value||'',
+      mukirogen:document.getElementById('rec-mukirogen')?.value||'',
+      etc:document.getElementById('rec-etc')?.value||'',
+    });
+    p.rec_date=null;
+  } else {
+    const content=document.getElementById('rec-content')?.value||'';
+    if(!content){toast('内容を入力してください','error');return;}
+    p.content=content;
+    p.result=document.getElementById('rec-result')?.value||'';
+    p.rec_date=document.getElementById('rec-date')?.value||null;
+  }
+  const {error}=id
+    ? await db.from('employee_records').update(p).eq('id',id)
+    : await db.from('employee_records').insert(p);
+  if(error){toast('保存に失敗しました','error');return;}
+  toast('記録を保存しました','success');
+  closeModal('modal-record-edit');
+  loadRecords();
+}
+
+async function deleteEmployeeRecord(id){
+  if(!confirm('この記録を削除しますか？'))return;
+  const {error}=await db.from('employee_records').delete().eq('id',id);
+  if(error)toast('削除に失敗しました','error');
+  else{toast('削除しました','success');loadRecords();}
+}
+
 async function openDocsModal(cid){
   const {data:c}=await db.from('contracts').select('*,sites(*,clients(*),work_patterns(*)),contract_employees(*)').eq('id',cid).single();
   if(!c)return;
@@ -1307,7 +1517,17 @@ async function openDocsModal(cid){
   const empIds=(c.contract_employees||[]).map(e=>e.employee_id);
   let empData={};
   if(empIds.length){const {data:emps}=await empDb.from('employees').select('*').in('id',empIds);(emps||[]).forEach(e=>empData[e.id]=e);}
+  // 従業員ごとの記録を取得
+  let recData={};
+  if(empIds.length){
+    const {data:recs}=await db.from('employee_records').select('*').in('employee_id',empIds).order('rec_date',{ascending:false});
+    (recs||[]).forEach(r=>{
+      if(!recData[r.employee_id])recData[r.employee_id]=[];
+      recData[r.employee_id].push(r);
+    });
+  }
   currentDocContract._empData=empData;
+  currentDocContract._recData=recData;
   document.getElementById('docs-title').textContent=`📄 書類を生成：${c.contract_no||c.sites?.name||''}`;
   document.getElementById('docs-contract-info').innerHTML=`
     <strong>${c.contract_no||'—'}</strong>　${c.sites?.clients?.name||'—'} / ${c.sites?.name||'—'}
@@ -1350,7 +1570,7 @@ function toWareki(dateStr){
   return `${era}${year}年${m}月${day}日`;
 }
 
-function buildPlaceholders(c, emp, settings){
+function buildPlaceholders(c, emp, settings, recData={}){
   const site=c.sites||{};const client=site.clients||{};
   const wp=(site.work_patterns||[])[0]||{};
   const workStart=wp.start_time?wp.start_time.substring(0,5):'';
@@ -1359,6 +1579,15 @@ function buildPlaceholders(c, emp, settings){
   const today=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'});
   // 有期スタッフが1人でもいるか判定
   const hasKiki=(c.contract_employees||[]).some(e=>e.employment_type!=='permanent');
+  // 従業員の記録
+  const empRecs=emp?(recData[emp.id]||[]):[];
+  const complaints=empRecs.filter(r=>r.type==='complaint');
+  const trainings=empRecs.filter(r=>r.type==='training');
+  const stabilityRec=empRecs.find(r=>r.type==='stability');
+  let stability={};
+  try{if(stabilityRec)stability=JSON.parse(stabilityRec.content||'{}');}catch(e){}
+  const complaintText=complaints.length?complaints.map(r=>`${r.rec_date?r.rec_date.substring(0,10)+' ':''}${r.content||''}${r.result?' → '+r.result:''}`).join('\n'):'';
+  const trainingText=trainings.length?trainings.map(r=>`${r.rec_date?r.rec_date.substring(0,10)+' ':''}${r.content||''}`).join('\n'):'';
   return{
     CONTRACT_NO: v(c.contract_no),
     CONTRACT_DATE: v(c.contract_date) || today,
@@ -1451,6 +1680,15 @@ function buildPlaceholders(c, emp, settings){
     HOLIDAY_WORK_DAYS:'',JOB_RANGE:'会社の定める業務全般',WORK_LOCATION_RANGE:'会社の定める事業所',
     RAISE_CRITERIA:'',RETIREMENT_PAY_CRITERIA:'',BONUS_CRITERIA:'',NOTICE_DAYS:'14',
     RETIREMENT_AGE:'',ALLOWANCE:'なし',REMARKS:'',
+    // 記録データ
+    COMPLAINT_TEXT: complaintText,
+    TRAINING_TEXT: trainingText,
+    STABILITY_HOPE: stability.hope||'',
+    STABILITY_DIRECT_REQ: stability.direct_req||'',
+    STABILITY_DIRECT_ANS: stability.direct_ans||'',
+    STABILITY_OTHER: stability.other||'',
+    STABILITY_MUKIROGEN: stability.mukirogen||'',
+    STABILITY_ETC: stability.etc||'',
   };
 }
 
@@ -1809,25 +2047,27 @@ ${sec('製造業務専門派遣先責任者 / 派遣元責任者')}
 </table>
 ${sec('就業状況')}
 <table style="width:100%;border-collapse:collapse;page-break-inside:auto;">${r('就業状況','別添タイムシートのとおり')}</table>
-${sec('社会保険・雇用保険の被保険者資格取得届の提出の有無')}
-<table style="width:100%;border-collapse:collapse;page-break-inside:auto;">
-  <tr><td style="${L}">健康保険</td><td style="${V}">${ph.KENPO_ARI||'有 ・ 無'}　　${ph.KENPO_ARI==='無'?'無の理由：':''}</td>
-      <td style="${L}">厚生年金保険</td><td style="${V}">${ph.KOSEI_ARI||'有 ・ 無'}　　${ph.KOSEI_ARI==='無'?'無の理由：':''}</td></tr>
-  <tr><td style="${L}">雇用保険</td><td style="${V}">${ph.KOYO_ARI||'有 ・ 無'}　　${ph.KOYO_ARI==='無'?'無の理由：':''}${ph.KOYO_ARI==='有'&&ph.KOYO_HOKEN_NO?'　被保険者番号：'+e(ph.KOYO_HOKEN_NO):''}</td><td style="${L}"></td><td style="${V}"></td></tr>
-</table>
-${sec('派遣労働者からの苦情処理状況')}
-<table style="width:100%;border-collapse:collapse;page-break-inside:auto;">
-  <tr><td style="${L}">申出を受けた日</td><td style="${V}">　　　年　　月　　日</td><td style="${L}">苦情内容・処理状況</td><td style="${V}">　</td></tr>
-</table>
-${sec('段階的かつ体系的な教育訓練を行った日時及び内容')}
-<table style="width:100%;border-collapse:collapse;page-break-inside:auto;">
-  <tr><td style="${L}">実施日時</td><td style="${V}">　</td><td style="${L}">教育訓練内容</td><td style="${V}">　</td></tr>
-</table>
+ ${sec('社会保険・雇用保険の被保険者資格取得届の提出の有無')}
+ <table style="width:100%;border-collapse:collapse;page-break-inside:auto;">
+   <tr><td style="${L}">健康保険</td><td style="${V}">${ph.KENPO_ARI||'有 ・ 無'}${ph.KENPO_ARI==='無'?'　　無の理由：':''}</td></tr>
+   <tr><td style="${L}">厚生年金保険</td><td style="${V}">${ph.KOSEI_ARI||'有 ・ 無'}${ph.KOSEI_ARI==='無'?'　　無の理由：':''}</td></tr>
+   <tr><td style="${L}">雇用保険</td><td style="${V}">${ph.KOYO_ARI||'有 ・ 無'}${ph.KOYO_ARI==='無'?'　　無の理由：':''}${ph.KOYO_ARI==='有'&&ph.KOYO_HOKEN_NO?'　被保険者番号：'+e(ph.KOYO_HOKEN_NO):''}</td></tr>
+ </table>
+ ${sec('派遣労働者からの苦情処理状況')}
+ <table style="width:100%;border-collapse:collapse;page-break-inside:auto;">
+   <tr><td style="${L}">苦情処理状況</td><td style="${V}" style="white-space:pre-wrap;">${e(ph.COMPLAINT_TEXT)||'　'}</td></tr>
+ </table>
+ ${sec('段階的かつ体系的な教育訓練を行った日時及び内容')}
+ <table style="width:100%;border-collapse:collapse;page-break-inside:auto;">
+   <tr><td style="${L}">教育訓練内容</td><td style="${V}" style="white-space:pre-wrap;">${e(ph.TRAINING_TEXT)||'　'}</td></tr>
+ </table>
 ${sec('雇用安定措置の内容')}
 <table style="width:100%;border-collapse:collapse;page-break-inside:auto;">
-  ${r('①派遣先への直接雇用の依頼','依頼日時・方法：<br>派遣先の回答日時・内容：')}
-  ${r('②他の派遣先の紹介','')}
-  ${r('③期間を定めない雇用の機会の確保','')}
+  ${r('希望する措置の内容', ph.STABILITY_HOPE||'　')}
+  ${r('①派遣先への直接雇用の依頼', (ph.STABILITY_DIRECT_REQ?'依頼日時・方法：'+ph.STABILITY_DIRECT_REQ:'依頼日時・方法：')+(ph.STABILITY_DIRECT_ANS?'\n派遣先の回答：'+ph.STABILITY_DIRECT_ANS:'\n派遣先の回答：'))}
+  ${r('②他の派遣先の紹介', ph.STABILITY_OTHER||'　')}
+  ${r('③期間を定めない雇用の機会の確保', ph.STABILITY_MUKIROGEN||'　')}
+  ${r('④その他', ph.STABILITY_ETC||'　')}
 </table>
 <div style="font-size:8.5pt;color:#555;margin-top:2mm;">※本台帳は労働者派遣終了後３年間保存すること（派遣法第37条）</div>`;
 }
@@ -2034,12 +2274,12 @@ async function genDoc(type){
     const emps=Object.values(c._empData||{});
     if(['sakicho','motocho','koyo_joken'].includes(type)&&emps.length>1){
       for(const emp of emps){
-        const ph=buildPlaceholders(c,emp,settings);
+        const ph=buildPlaceholders(c,emp,settings,c._recData||{});
         openPdfWindow(builder.title, builder.fn(ph), '');
       }
     } else {
       const emp=emps[0]||null;
-      const ph=buildPlaceholders(c,emp,settings);
+      const ph=buildPlaceholders(c,emp,settings,c._recData||{});
       openPdfWindow(builder.title, builder.fn(ph), '');
     }
     toast(builder.title+'を生成しました','success');
@@ -2052,7 +2292,7 @@ async function genEmpDoc(type,empId){
     const settings=await getSettingsData();
     const emp=(c._empData||{})[empId];
     const builder=DOC_BUILDERS[type];if(!builder)return;
-    const ph=buildPlaceholders(c,emp,settings);
+    const ph=buildPlaceholders(c,emp,settings,c._recData||{});
     openPdfWindow(builder.title, builder.fn(ph), '');
     toast(builder.title+'を生成しました','success');
   }catch(e){console.error(e);toast('生成に失敗しました：'+e.message,'error');}
@@ -2069,7 +2309,7 @@ async function genAllDocs(){
     // スタッフごと
     for(const ce of(c.contract_employees||[])){
       const emp=(c._empData||{})[ce.employee_id];
-      const ph=buildPlaceholders(c,emp,settings);
+      const ph=buildPlaceholders(c,emp,settings,c._recData||{});
       for(const type of['motocho','koyo_joken','chicho']){
         openPdfWindow(DOC_BUILDERS[type].title, DOC_BUILDERS[type].fn(ph), '');
       }
