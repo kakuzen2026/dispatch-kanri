@@ -502,6 +502,10 @@ tr:hover td{background:rgba(255,255,255,.02);}
           <div class="form-group"><label class="form-label">時間外・休日労働ルール</label><input type="text" class="form-input" id="s-overtime" placeholder="例: 月20時間以内"></div>
           <div class="form-group"><label class="form-label">就業日</label><input type="text" class="form-input" id="s-work-days" placeholder="例: 月〜金（土日祝休）"></div>
         </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">事業所単位抵触日</label><input type="date" class="form-input" id="s-jissai-date"></div>
+          <div class="form-group"><label class="form-label">組織単位抵触日</label><input type="date" class="form-input" id="s-soshiki-date"></div>
+        </div>
       </div>
 
       <div class="form-group"><label class="form-label">安全及び衛生</label><textarea class="form-textarea" id="s-safety"></textarea></div>
@@ -868,6 +872,7 @@ async function openSiteModal(site){
     's-complaint-client-dept':'complaint_client_dept','s-complaint-client-title':'complaint_client_title','s-complaint-client-name':'complaint_client_name','s-complaint-client-tel':'complaint_client_tel',
     's-haken-mgr-dept-site':'haken_mgr_dept','s-haken-mgr-title-site':'haken_mgr_title','s-haken-mgr-name-site':'haken_mgr_name','s-haken-mgr-tel-site':'haken_mgr_tel',
     's-job-detail':'job_detail','s-authority':'authority_detail','s-overtime':'overtime_rule','s-work-days':'work_days',
+    's-jissai-date':'jissai_shokuchoku_date','s-soshiki-date':'soshiki_shokuchoku_date',
     's-notes-site':'notes',
   };
   Object.entries(fields).forEach(([elId,key])=>{ document.getElementById(elId).value=site?.[key]||''; });
@@ -926,6 +931,8 @@ async function saveSite(){
     authority_detail:document.getElementById('s-authority').value,
     overtime_rule:document.getElementById('s-overtime').value,
     work_days:document.getElementById('s-work-days').value,
+    jissai_shokuchoku_date:document.getElementById('s-jissai-date').value||null,
+    soshiki_shokuchoku_date:document.getElementById('s-soshiki-date').value||null,
     safety_content:document.getElementById('s-safety').value,
     welfare_content:document.getElementById('s-welfare').value,
     notes:document.getElementById('s-notes-site').value,
@@ -1141,6 +1148,8 @@ async function saveContract(){
     contract_end:document.getElementById('ct-end').value,
     haken_ryokin:document.getElementById('ct-ryokin').value,
     ryokin_tani:document.getElementById('ct-ryokin-tani').value,
+    jissai_shokuchoku_date:site?.jissai_shokuchoku_date||null,
+    soshiki_shokuchoku_date:site?.soshiki_shokuchoku_date||null,
     job_detail:site?.job_detail||'',
     authority_detail:site?.authority_detail||'',
     overtime_rule:site?.overtime_rule||'',
@@ -1241,7 +1250,6 @@ async function openDocsModal(cid){
     <span class="badge badge-blue" style="margin-left:8px;">${(c.contract_employees||[]).length}名</span>`;
   document.getElementById('docs-site-btns').innerHTML=`
     <button class="doc-btn" onclick="genDoc('kobetsu')"><span class="doc-icon">📋</span><div class="doc-info"><div class="doc-title">個別契約書</div><div class="doc-sub">派遣法26条・現場単位</div></div></button>
-    <button class="doc-btn" onclick="genDoc('sakicho')"><span class="doc-icon">📊</span><div class="doc-info"><div class="doc-title">派遣先管理台帳</div><div class="doc-sub">派遣法42条・現場単位</div></div></button>
     <button class="doc-btn" onclick="genDoc('motocho')"><span class="doc-icon">📁</span><div class="doc-info"><div class="doc-title">派遣元管理台帳</div><div class="doc-sub">派遣法37条・現場単位</div></div></button>`;
   // スタッフごとのボタン（雇用契約書兼就業条件明示書のみ）
   const empBtnsHtml=(c.contract_employees||[]).map(ce=>{
@@ -1250,6 +1258,7 @@ async function openDocsModal(cid){
     return`<div style="margin-bottom:12px;"><div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--text2);">👤 ${name}（${isFixed?'有期':'無期'}）</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="doc-btn btn-sm" style="padding:8px 12px;" onclick="genEmpDoc('koyo_joken','${ce.employee_id}')"><span class="doc-icon" style="font-size:16px;">📑</span><div class="doc-info"><div class="doc-title" style="font-size:12px;">雇用契約書兼就業条件明示書</div></div></button>
+        <button class="doc-btn btn-sm" style="padding:8px 12px;" onclick="genEmpDoc('chicho','${ce.employee_id}')"><span class="doc-icon" style="font-size:16px;">📨</span><div class="doc-info"><div class="doc-title" style="font-size:12px;">派遣先通知書</div></div></button>
       </div></div>`;
   }).join('');
   document.getElementById('docs-emp-btns').innerHTML=empBtnsHtml;
@@ -1409,200 +1418,456 @@ function row2(l1,v1,l2,v2){ return `<tr><th>${e(l1)}</th><td>${e(v1)||'&nbsp;'}<
 
 // ===== HTML テンプレート生成関数 =====
 function buildKobetsuHtml(ph){
+  const itemStyle = 'border:1px solid #666;padding:3px 6px;font-size:9.5pt;line-height:1.7;';
+  const labelStyle = itemStyle+'background:#f0f0f0;font-weight:bold;white-space:nowrap;width:36%;';
+  const valStyle = itemStyle+'width:64%;';
+  const tbl = (rows) => `<table style="width:100%;border-collapse:collapse;margin:1mm 0;">${rows}</table>`;
+  const r = (label, val) => `<tr><td style="${labelStyle}">${label}</td><td style="${valStyle}">${val||'　'}</td></tr>`;
+  const r2 = (l1,v1,l2,v2) => `<tr><td style="${labelStyle}">${l1}</td><td style="${valStyle}">${v1||'　'}</td><td style="${labelStyle}">${l2}</td><td style="${valStyle}">${v2||'　'}</td></tr>`;
+  const section = (title) => `<div style="background:#e8e8e8;border:1px solid #666;border-bottom:none;padding:2px 6px;font-size:9.5pt;font-weight:bold;margin-top:3mm;">■ ${title}</div>`;
+
   return `
-    <div class="meta">締結日：${e(ph.CONTRACT_DATE)}　契約No.${e(ph.CONTRACT_NO)}</div>
-    <h1>労働者派遣個別契約書</h1>
-    <p style="text-align:center;margin-bottom:6mm;font-size:10pt;">（労働者派遣法第26条に基づく）</p>
-    <div class="parties">
-      <div class="party"><div class="party-label">派遣元（甲）</div><div class="party-body">
-        〒${e(ph.COMPANY_ADDRESS).substring(0,8)||''}<br>${e(ph.COMPANY_ADDRESS)}<br>
-        ${e(ph.COMPANY_NAME)}<br>代表者：${e(ph.COMPANY_CEO)}<br>
-        許可番号：${e(ph.LICENSE_NO)}
-      </div></div>
-      <div class="party"><div class="party-label">派遣先（乙）</div><div class="party-body">
-        ${e(ph.CLIENT_ADDRESS)}<br>
-        ${e(ph.CLIENT_NAME)}<br>代表者：${e(ph.CLIENT_CEO)}
-      </div></div>
-    </div>
-    <h2>第１条　派遣就業条件</h2>
-    <table>
-      ${row('派遣先事業所', ph.CLIENT_SITE_NAME+'　'+ph.CLIENT_SITE_ADDRESS)}
-      ${row('就業場所', ph.WORK_LOCATION_NAME+'　'+ph.WORK_LOCATION_ADDRESS)}
-      ${row('組織単位', ph.ORGANIZATION_UNIT+'（'+ph.UNIT_MANAGER_TITLE+'）')}
-      ${row('派遣人員', ph.STAFF_COUNT+'名')}
-      ${row('派遣期間', ph.DISPATCH_START+'　〜　'+ph.DISPATCH_END)}
-      ${row('業務内容', ph.JOB_DETAIL)}
-      ${row('業務に伴う責任の程度', ph.AUTHORITY_DETAIL)}
-    </table>
-    <h2>第２条　就業時間・休日</h2>
-    <table>
-      ${row('就業日', ph.WORK_DAYS)}
-      ${row('就業時間', ph.WORK_START+'　〜　'+ph.WORK_END+'（休憩：'+ph.BREAK_TIME+'）')}
-      ${row('時間外・休日労働', ph.OVERTIME_RULE)}
-    </table>
-    <h2>第３条　責任者</h2>
-    <table>
-      <tr><th>派遣先責任者</th><td>（部署）${e(ph.CLIENT_MGR_DEPT)}　（役職）${e(ph.CLIENT_MGR_TITLE)}　（氏名）${e(ph.CLIENT_MGR_NAME)}　（電話）${e(ph.CLIENT_MGR_TEL)}</td></tr>
-      <tr><th>派遣元責任者</th><td>（部署）${e(ph.HAKEN_MGR_DEPT)}　（役職）${e(ph.HAKEN_MGR_TITLE)}　（氏名）${e(ph.HAKEN_MGR_NAME)}　（電話）${e(ph.HAKEN_MGR_TEL)}</td></tr>
-      <tr><th>指揮命令者</th><td>（部署）${e(ph.CMD_DEPT)}　（役職）${e(ph.CMD_TITLE)}　（氏名）${e(ph.CMD_NAME)}　（電話）${e(ph.CMD_TEL)}</td></tr>
-    </table>
-    <h2>第４条　苦情申出先</h2>
-    <table>
-      <tr><th>派遣先</th><td>（部署）${e(ph.COMPLAINT_CLIENT_DEPT)}　（役職）${e(ph.COMPLAINT_CLIENT_TITLE)}　（氏名）${e(ph.COMPLAINT_CLIENT_NAME)}　（電話）${e(ph.COMPLAINT_CLIENT_TEL)}</td></tr>
-      <tr><th>派遣元</th><td>（部署）${e(ph.COMPLAINT_HAKEN_DEPT)}　（役職）${e(ph.COMPLAINT_HAKEN_TITLE)}　（氏名）${e(ph.COMPLAINT_HAKEN_NAME)}　（電話）${e(ph.COMPLAINT_HAKEN_TEL)}</td></tr>
-    </table>
-    <h2>第５条　安全衛生・福祉</h2>
-    <table>
-      ${row('安全及び衛生', ph.SAFETY_CONTENT)}
-      ${row('福祉増進の便宜供与', ph.WELFARE_CONTENT)}
-    </table>
-    <div class="sign-area">
-      <div class="sign-box"><div class="sign-label">派遣元（甲）署名</div>
-        ${e(ph.COMPANY_NAME)}<br>代表者：${e(ph.COMPANY_CEO)}<br>
-        <div class="sign-line"></div>署名　　　　　　　　　　　<span class="stamp">㊞</span>
-      </div>
-      <div class="sign-box"><div class="sign-label">派遣先（乙）署名</div>
-        ${e(ph.CLIENT_NAME)}<br>代表者：${e(ph.CLIENT_CEO)}<br>
-        <div class="sign-line"></div>署名　　　　　　　　　　　<span class="stamp">㊞</span>
-      </div>
-    </div>`;
+<style>
+  body{font-family:'MS Mincho','Yu Mincho','Hiragino Mincho ProN',serif;font-size:9.5pt;line-height:1.7;color:#000;background:#fff;padding:8mm 12mm;}
+  h1{font-size:15pt;font-weight:bold;text-align:center;letter-spacing:6px;margin:0 0 3mm;}
+  .meta{font-size:9pt;margin-bottom:2mm;}
+  .intro{font-size:9.5pt;margin:2mm 0 3mm;line-height:1.8;}
+  .check{margin-right:4px;}
+  .sign-grid{display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-top:4mm;}
+  .sign-box{border:1px solid #666;padding:3px 8px;min-height:18mm;font-size:9pt;line-height:1.8;}
+  .sign-label{font-weight:bold;border-bottom:1px solid #999;padding-bottom:1px;margin-bottom:2px;font-size:9pt;}
+  @media print{body{padding:5mm 10mm;}@page{size:A4;margin:0;}}
+</style>
+
+<div class="meta" style="text-align:right;">契約No.${e(ph.CONTRACT_NO)}　　令和　　年　　月　　日</div>
+<h1>労 働 者 派 遣 個 別 契 約 書</h1>
+<div class="intro">
+  ${e(ph.COMPANY_NAME)}（派遣元）は、${e(ph.CLIENT_NAME)}（派遣先）に対し、次の条件のもとに、労働者派遣を行うものとする。
+</div>
+
+${section('派遣先事業所')}
+${tbl(r('名称・所在地', e(ph.CLIENT_SITE_NAME)+'　'+e(ph.CLIENT_SITE_ADDRESS)))}
+
+${section('就業場所')}
+${tbl(r('名称・所在地（部署・電話）', e(ph.WORK_LOCATION_NAME)+'　'+e(ph.WORK_LOCATION_ADDRESS)+'　（部署）'+e(ph.WORK_DEPT)+'　（電話）'+e(ph.WORK_TEL)))}
+<div style="font-size:8.5pt;color:#555;padding:1px 6px;border:1px solid #666;border-top:none;font-style:italic;">（注）派遣元事業主が派遣労働者と連絡が取れるように、所属部署及び電話番号も併せて記載</div>
+
+${section('派遣労働者を無期雇用又は60歳以上に限定するか否か')}
+<div style="border:1px solid #666;padding:3px 8px;font-size:9.5pt;">
+  □ 無期雇用派遣労働者に限定　又は 60歳以上の者に限定　　☑ 限定なし
+</div>
+
+${section('協定対象派遣労働者に限定するか否か／派遣人員')}
+${tbl(`<tr><td style="${labelStyle}">協定対象限定</td><td style="${valStyle}">☑ 協定対象派遣労働者に限定　□ 限定なし</td><td style="${labelStyle}">派遣人員</td><td style="${valStyle}">${e(ph.STAFF_COUNT)}人</td></tr>`)}
+
+${section('業務内容')}
+${tbl(r('業務内容詳細', e(ph.JOB_DETAIL)))}
+<div style="font-size:8.5pt;color:#555;padding:1px 6px;border:1px solid #666;border-top:none;font-style:italic;">（注）できる限り詳細に記載</div>
+
+${section('業務に伴う責任の程度')}
+${tbl(r('権限の範囲・程度', e(ph.AUTHORITY_DETAIL)||'□ 付与される権限なし　□ 付与される権限あり：'))}
+
+${section('組織単位（組織の長の職名）')}
+${tbl(r('名称・長の職名', e(ph.ORGANIZATION_UNIT)+(ph.UNIT_MANAGER_TITLE?'　（'+e(ph.UNIT_MANAGER_TITLE)+'）':'')))}
+
+${section('指揮命令者')}
+${tbl(r('部署・役職・氏名・電話', '（部署）'+e(ph.CMD_DEPT)+'　（役職）'+e(ph.CMD_TITLE)+'　（氏名）'+e(ph.CMD_NAME)+'　（電話）'+e(ph.CMD_TEL)))}
+
+${section('派遣期間・就業日')}
+${tbl(`<tr>
+  <td style="${labelStyle}">派遣期間</td>
+  <td style="${valStyle}">令和　　年　　月　　日から令和　　年　　月　　日<br><span style="font-size:8.5pt;color:#555;">（${e(ph.DISPATCH_START)}〜${e(ph.DISPATCH_END)}）</span></td>
+  <td style="${labelStyle}">就業日</td>
+  <td style="${valStyle}">${e(ph.WORK_DAYS)}</td>
+</tr>`)}
+
+${section('就業時間及び休憩時間')}
+${tbl(r('就業時間・休憩', e(ph.WORK_START)+'から'+e(ph.WORK_END)+'　（休憩時間 '+e(ph.BREAK_TIME)+'）'))}
+<div style="font-size:8.5pt;color:#555;padding:1px 6px;border:1px solid #666;border-top:none;font-style:italic;">（注）シフト制による場合は、「別添シフト表による」と記載しシフト表を添付</div>
+
+${section('就業日外労働及び就業時間外労働')}
+<div style="border:1px solid #666;padding:3px 8px;font-size:9.5pt;">
+  ${e(ph.OVERTIME_RULE)||'上記就業日以外の就労は、月2日まで、上記就業時間外の労働の限度は、１日5時間　月36時間　年360時間までとする'}
+</div>
+
+${section('製造業務専門派遣先責任者　（製造業務でない場合は「派遣先責任者」）')}
+${tbl(r('部署・役職・氏名・電話', '（部署）'+e(ph.CLIENT_MGR_DEPT)+'　（役職）'+e(ph.CLIENT_MGR_TITLE)+'　（氏名）'+e(ph.CLIENT_MGR_NAME)+'　（電話）'+e(ph.CLIENT_MGR_TEL)))}
+
+${section('製造業務専門派遣元責任者　（製造業務でない場合は「派遣元責任者」）')}
+${tbl(r('部署・役職・氏名・電話', '（部署）'+e(ph.HAKEN_MGR_DEPT)+'　（役職）'+e(ph.HAKEN_MGR_TITLE)+'　（氏名）'+e(ph.HAKEN_MGR_NAME)+'　（電話）'+e(ph.HAKEN_MGR_TEL)))}
+
+${section('安全及び衛生')}
+${tbl(r('内容', e(ph.SAFETY_CONTENT)))}
+
+${section('福祉増進のための便宜供与')}
+${tbl(r('内容', e(ph.WELFARE_CONTENT)))}
+
+${section('派遣先が派遣労働者を雇用する場合の紛争防止措置')}
+<div style="border:1px solid #666;padding:3px 8px;font-size:9pt;line-height:1.8;">
+  派遣先が派遣終了後に、当該派遣労働者を雇用する場合、その雇用意思を事前に派遣元へ示すこととする。
+</div>
+
+${section('労働者派遣契約の解除に当たって講ずる措置')}
+<div style="border:1px solid #666;padding:3px 8px;font-size:9pt;line-height:1.8;">
+  （1）事前申入れ：派遣先の責に帰すべき事由により解除する場合、相当の猶予期間をもって申入れを行う。<br>
+  （2）就業機会の確保：派遣先・派遣元は新たな就業機会の確保を図る。<br>
+  （3）損害賠償：派遣先の責による解除の場合、休業手当相当額以上の賠償を行う。<br>
+  （4）理由の明示：派遣元から請求があったときは、解除の理由を明らかにする。
+</div>
+
+${section('苦情の申出先・処理方法・連携体制')}
+${tbl(`
+  <tr><td style="${labelStyle}">（1）苦情申出を受ける者<br>派遣先</td><td style="${valStyle}">（部署）${e(ph.COMPLAINT_CLIENT_DEPT)}　（役職）${e(ph.COMPLAINT_CLIENT_TITLE)}　（氏名）${e(ph.COMPLAINT_CLIENT_NAME)}　（電話）${e(ph.COMPLAINT_CLIENT_TEL)}</td></tr>
+  <tr><td style="${labelStyle}">派遣元</td><td style="${valStyle}">（部署）${e(ph.COMPLAINT_HAKEN_DEPT)}　（役職）${e(ph.COMPLAINT_HAKEN_TITLE)}　（氏名）${e(ph.COMPLAINT_HAKEN_NAME)}　（電話）${e(ph.COMPLAINT_HAKEN_TEL)}</td></tr>
+  <tr><td style="${labelStyle}">（2）処理方法・連携体制</td><td style="${valStyle}" style="font-size:9pt;">
+    ①派遣先で受けた苦情は直ちに派遣先責任者へ連絡し、誠意をもって迅速に処理し結果を派遣労働者に通知する。<br>
+    ②派遣元で受けた苦情は直ちに派遣元責任者へ連絡し、誠意をもって迅速に処理し結果を派遣労働者に通知する。<br>
+    ③双方は相互に遅滞なく通知・連絡調整を行い解決を図る。
+  </td></tr>
+`)}
+
+<div class="sign-grid">
+  <div class="sign-box">
+    <div class="sign-label">派　遣　先</div>
+    （所在地）${e(ph.CLIENT_ADDRESS)}<br>
+    （事業所名）${e(ph.CLIENT_NAME)}<br>
+    （代表者名）${e(ph.CLIENT_CEO)}<br>
+    <div style="margin-top:6mm;border-bottom:1px solid #333;width:80%;"></div>
+    <span style="font-size:9pt;">（役職）　　　　　　　（氏名）　　　　　　　　　　　　　　　　　印</span>
+  </div>
+  <div class="sign-box">
+    <div class="sign-label">派　遣　元</div>
+    （所在地）${e(ph.COMPANY_ADDRESS)}<br>
+    （事業所名）${e(ph.COMPANY_NAME)}<br>
+    （代表者名）${e(ph.COMPANY_CEO)}<br>
+    （許可番号）${e(ph.LICENSE_NO)}<br>
+    <div style="margin-top:6mm;border-bottom:1px solid #333;width:80%;"></div>
+    <span style="font-size:9pt;">（役職）　　　　　　　（氏名）　　　　　　　　　　　　　　　　　印</span>
+  </div>
+</div>`;
 }
 
 function buildSakichoHtml(ph){
+  const S='border:1px solid #666;padding:3px 6px;font-size:9pt;line-height:1.7;vertical-align:top;';
+  const L=S+'background:#f0f0f0;font-weight:bold;white-space:nowrap;width:34%;';
+  const V=S+'width:66%;';
+  const r=(l,v)=>`<tr><td style="${L}">${l}</td><td style="${V}">${v||'　'}</td></tr>`;
+  const sec=(t)=>`<div style="background:#e0e0e0;border:1px solid #666;border-bottom:none;padding:2px 6px;font-size:9pt;font-weight:bold;margin-top:2mm;">■ ${t}</div>`;
   return `
-    <h1>派遣先管理台帳</h1>
-    <p style="text-align:center;margin-bottom:6mm;font-size:10pt;">（労働者派遣法第42条に基づく）</p>
-    <table style="margin-bottom:4mm;">
-      ${row('派遣先事業所名', ph.CLIENT_SITE_NAME)}
-      ${row('所在地', ph.CLIENT_SITE_ADDRESS)}
-    </table>
-    <h2>派遣労働者情報</h2>
-    <table>
-      ${row('①　氏名', ph.EMPLOYEE_NAME)}
-      ${row('②　派遣元事業主', ph.COMPANY_NAME+'　（'+ph.COMPANY_ADDRESS+'）')}
-      ${row('⑤　協定対象', '協定対象派遣労働者')}
-      ${row('⑥　無期・有期の別', '有期雇用')}
-      ${row('⑦　派遣就業をした日', '（別紙タイムシートによる）')}
-      ${row('⑧　始業・終業・休憩', '（別紙タイムシートによる）')}
-      ${row('⑨　業務の種類', ph.JOB_DETAIL)}
-      ${row('⑩　業務に伴う責任の程度', ph.AUTHORITY_DETAIL)}
-      ${row('⑪　就業場所・組織単位', ph.CLIENT_SITE_NAME+'　組織単位：'+ph.ORGANIZATION_UNIT)}
-    </table>
-    <h2>責任者</h2>
-    <table>
-      <tr><th>⑮　派遣先責任者</th><td>（部署）${e(ph.CLIENT_MGR_DEPT)}　（役職）${e(ph.CLIENT_MGR_TITLE)}　（氏名）${e(ph.CLIENT_MGR_NAME)}　（電話）${e(ph.CLIENT_MGR_TEL)}</td></tr>
-      <tr><th>　　派遣元責任者</th><td>（部署）${e(ph.HAKEN_MGR_DEPT)}　（役職）${e(ph.HAKEN_MGR_TITLE)}　（氏名）${e(ph.HAKEN_MGR_NAME)}　（電話）${e(ph.HAKEN_MGR_TEL)}</td></tr>
-    </table>
-    <h2>月次通知事項（毎月1回以上通知義務）</h2>
-    <table>
-      ${row('氏名', ph.EMPLOYEE_NAME)}
-      ${row('就業日・始終業・休憩', '（別紙タイムシートによる）')}
-      ${row('業務の種類', ph.JOB_DETAIL)}
-      ${row('事業所名・就業場所', ph.CLIENT_SITE_NAME+'　'+ph.CLIENT_SITE_ADDRESS)}
-      ${row('組織単位', ph.ORGANIZATION_UNIT)}
-    </table>
-    <div class="note">※本台帳は派遣期間終了日から３年間保存すること（派遣法第42条第２項）</div>`;
+<style>body{font-family:'MS Mincho','Yu Mincho',serif;font-size:9pt;line-height:1.7;color:#000;padding:8mm 12mm;}
+h1{font-size:14pt;font-weight:bold;text-align:center;letter-spacing:5px;margin:0 0 2mm;}
+@media print{body{padding:5mm 10mm;}@page{size:A4;margin:0;}}</style>
+<h1>派 遣 先 管 理 台 帳</h1>
+<p style="text-align:center;font-size:8.5pt;margin-bottom:3mm;">（労働者派遣法第42条に基づく）【労働者派遣終了後３年間保存】</p>
+${sec('派遣労働者の氏名')}
+<table style="width:100%;border-collapse:collapse;">${r('氏名',e(ph.EMPLOYEE_NAME))}</table>
+${sec('派遣先の事業所')}
+<table style="width:100%;border-collapse:collapse;">
+  ${r('名称・所在地', e(ph.CLIENT_SITE_NAME)+'　'+e(ph.CLIENT_SITE_ADDRESS))}
+  ${r('就業場所・組織単位', e(ph.WORK_LOCATION_NAME)+'　組織単位：'+e(ph.ORGANIZATION_UNIT))}
+</table>
+${sec('派遣元事業主')}
+<table style="width:100%;border-collapse:collapse;">
+  ${r('名称・所在地', e(ph.COMPANY_NAME)+'　'+e(ph.COMPANY_ADDRESS))}
+</table>
+${sec('協定対象派遣労働者であるか否かの別')}
+<table style="width:100%;border-collapse:collapse;">${r('','☑ 協定対象派遣労働者　　□ 協定対象派遣労働者ではない（派遣先均等・均衡方式）')}</table>
+${sec('無期・有期の別 / 60歳以上か否か')}
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td style="${L}">雇用期間の別</td><td style="${V}">□ 無期雇用　　☑ 有期雇用（${e(ph.CONTRACT_START)}から${e(ph.CONTRACT_END)}まで）</td></tr>
+  <tr><td style="${L}">年齢</td><td style="${V}">□ 60歳以上　　☑ 60歳未満</td></tr>
+</table>
+${sec('業務内容 / 責任の程度')}
+<table style="width:100%;border-collapse:collapse;">
+  ${r('業務内容', e(ph.JOB_DETAIL))}
+  ${r('業務に伴う責任の程度', e(ph.AUTHORITY_DETAIL)||'□ 付与される権限なし　□ 付与される権限あり：')}
+</table>
+${sec('派遣期間 / 就業日')}
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td style="${L}">派遣期間</td><td style="${V}">令和　　年　　月　　日から令和　　年　　月　　日まで<br><span style="color:#555;font-size:8.5pt;">（${e(ph.DISPATCH_START)}〜${e(ph.DISPATCH_END)}）</span></td></tr>
+  ${r('就業日', e(ph.WORK_DAYS))}
+</table>
+${sec('就業時間及び休憩時間')}
+<table style="width:100%;border-collapse:collapse;">${r('就業時間・休憩', e(ph.WORK_START)+'から'+e(ph.WORK_END)+'　（休憩 '+e(ph.BREAK_TIME)+'）')}</table>
+${sec('就業日外労働及び就業時間外労働')}
+<table style="width:100%;border-collapse:collapse;">${r('内容', e(ph.OVERTIME_RULE)||'上記就業日以外の就労は月2日まで、上記就業時間外の労働の限度は１日5時間　月36時間　年360時間まで')}</table>
+${sec('製造業務専門派遣先責任者（製造業務でない場合は「派遣先責任者」）')}
+<table style="width:100%;border-collapse:collapse;">${r('部署・役職・氏名・電話','（部署）'+e(ph.CLIENT_MGR_DEPT)+'　（役職）'+e(ph.CLIENT_MGR_TITLE)+'　（氏名）'+e(ph.CLIENT_MGR_NAME)+'　（電話）'+e(ph.CLIENT_MGR_TEL))}</table>
+${sec('製造業務専門派遣元責任者（製造業務でない場合は「派遣元責任者」）')}
+<table style="width:100%;border-collapse:collapse;">${r('部署・役職・氏名・電話','（部署）'+e(ph.HAKEN_MGR_DEPT)+'　（役職）'+e(ph.HAKEN_MGR_TITLE)+'　（氏名）'+e(ph.HAKEN_MGR_NAME)+'　（電話）'+e(ph.HAKEN_MGR_TEL))}</table>
+${sec('就業状況')}
+<table style="width:100%;border-collapse:collapse;">${r('就業状況','別添タイムシートのとおり')}</table>
+${sec('社会保険・雇用保険の被保険者資格取得届の提出の有無')}
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td style="${L}">健康保険</td><td style="${V}">有 ・ 無　　無の理由：</td>
+      <td style="${L}">厚生年金保険</td><td style="${V}">有 ・ 無　　無の理由：</td></tr>
+  <tr><td style="${L}">雇用保険</td><td style="${V}">有 ・ 無　　無の理由：</td><td style="${L}"></td><td style="${V}"></td></tr>
+</table>
+${sec('派遣労働者からの苦情処理状況')}
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td style="${L}">申出を受けた日</td><td style="${V}">　　　年　　月　　日</td><td style="${L}">苦情内容・処理状況</td><td style="${V}">　</td></tr>
+</table>
+${sec('段階的かつ体系的な教育訓練を行った日時及び内容')}
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td style="${L}">実施日時</td><td style="${V}">　</td><td style="${L}">教育訓練内容</td><td style="${V}">　</td></tr>
+</table>
+${sec('雇用安定措置の内容')}
+<table style="width:100%;border-collapse:collapse;">
+  ${r('①派遣先への直接雇用の依頼','依頼日時・方法：<br>派遣先の回答日時・内容：')}
+  ${r('②他の派遣先の紹介','')}
+  ${r('③期間を定めない雇用の機会の確保','')}
+</table>
+<div style="font-size:8.5pt;color:#555;margin-top:2mm;">※本台帳は労働者派遣終了後３年間保存すること（派遣法第37条）</div>`;
 }
 
 function buildMotochoHtml(ph){
+  const S='border:1px solid #666;padding:3px 6px;font-size:9pt;line-height:1.7;vertical-align:top;';
+  const L=S+'background:#f0f0f0;font-weight:bold;white-space:nowrap;width:34%;';
+  const V=S+'width:66%;';
+  const r=(l,v)=>`<tr><td style="${L}">${l}</td><td style="${V}">${v||'　'}</td></tr>`;
+  const sec=(t)=>`<div style="background:#e0e0e0;border:1px solid #666;border-bottom:none;padding:2px 6px;font-size:9pt;font-weight:bold;margin-top:2mm;">■ ${t}</div>`;
   return `
-    <h1>派遣元管理台帳</h1>
-    <p style="text-align:center;margin-bottom:6mm;font-size:10pt;">（労働者派遣法第37条に基づく）</p>
-    <table style="margin-bottom:4mm;">
-      ${row('派遣元事業主名', ph.COMPANY_NAME)}
-      ${row('許可番号', ph.LICENSE_NO)}
-    </table>
-    <h2>派遣労働者情報</h2>
-    <table>
-      ${row('①　氏名', ph.EMPLOYEE_NAME)}
-      ${row('②　協定対象', '協定対象派遣労働者')}
-      ${row('③　無期・有期の別', '有期雇用（'+ph.CONTRACT_START+'〜'+ph.CONTRACT_END+'）')}
-      ${row('④　60歳以上か否か', '60歳未満')}
-      ${row('⑤　派遣先の名称', ph.CLIENT_NAME)}
-      ${row('⑥　派遣先事業所', ph.CLIENT_SITE_NAME)}
-      ${row('⑦　所在地・就業場所・組織単位', ph.CLIENT_SITE_ADDRESS+'　組織単位：'+ph.ORGANIZATION_UNIT)}
-      ${row('⑧　派遣期間・就業日', ph.DISPATCH_START+'〜'+ph.DISPATCH_END+'　就業日：'+ph.WORK_DAYS)}
-      ${row('⑨　始業・終業・休憩', '始業：'+ph.WORK_START+'　終業：'+ph.WORK_END+'　休憩：'+ph.BREAK_TIME)}
-      ${row('⑩　業務の種類', ph.JOB_DETAIL)}
-      ${row('⑪　業務に伴う責任の程度', ph.AUTHORITY_DETAIL)}
-      ${row('⑭　派遣元責任者', ph.HAKEN_MGR_NAME+'　（'+ph.HAKEN_MGR_DEPT+'）')}
-      ${row('　　派遣先責任者', ph.CLIENT_MGR_NAME+'　（'+ph.CLIENT_MGR_DEPT+'）')}
-      ${row('⑮　時間外・休日労働', ph.OVERTIME_RULE)}
-      ${row('⑰　雇用保険被保険者番号', ph.KOYO_HOKEN_NO)}
-      ${row('　　社会保険被保険者番号', ph.KENPO_NO)}
-    </table>
-    <div class="note">※本台帳は派遣期間終了日から３年間保存すること（派遣法第37条第２項）</div>`;
+<style>body{font-family:'MS Mincho','Yu Mincho',serif;font-size:9pt;line-height:1.7;color:#000;padding:8mm 12mm;}
+h1{font-size:14pt;font-weight:bold;text-align:center;letter-spacing:5px;margin:0 0 2mm;}
+@media print{body{padding:5mm 10mm;}@page{size:A4;margin:0;}}</style>
+<h1>派 遣 元 管 理 台 帳</h1>
+<p style="text-align:center;font-size:8.5pt;margin-bottom:3mm;">（労働者派遣法第37条に基づく）【労働者派遣終了後３年間保存】</p>
+${sec('派遣労働者の氏名')}
+<table style="width:100%;border-collapse:collapse;">${r('氏名',e(ph.EMPLOYEE_NAME))}</table>
+${sec('派遣先の名称 / 派遣先事業所の名称及び所在地')}
+<table style="width:100%;border-collapse:collapse;">
+  ${r('派遣先の名称', e(ph.CLIENT_NAME))}
+  ${r('派遣先事業所の名称及び所在地', e(ph.CLIENT_SITE_NAME)+'　'+e(ph.CLIENT_SITE_ADDRESS))}
+  ${r('就業場所・組織単位', e(ph.WORK_LOCATION_NAME)+'　組織単位：'+e(ph.ORGANIZATION_UNIT))}
+</table>
+${sec('派遣労働者の雇用期間 / 60歳以上か否か')}
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td style="${L}">雇用期間の別</td><td style="${V}">□ 無期雇用　　☑ 有期雇用（${e(ph.CONTRACT_START)}から${e(ph.CONTRACT_END)}まで）</td></tr>
+  <tr><td style="${L}">60歳以上か否か</td><td style="${V}">□ 60歳以上　　☑ 60歳未満</td></tr>
+</table>
+${sec('協定対象派遣労働者であるか否かの別')}
+<table style="width:100%;border-collapse:collapse;">${r('','☑ 協定対象派遣労働者　　□ 協定対象派遣労働者ではない（派遣先均等・均衡方式）')}</table>
+${sec('業務内容 / 責任の程度')}
+<table style="width:100%;border-collapse:collapse;">
+  ${r('業務内容', e(ph.JOB_DETAIL))}
+  ${r('業務に伴う責任の程度', e(ph.AUTHORITY_DETAIL)||'□ 付与される権限なし　□ 付与される権限あり：')}
+</table>
+${sec('派遣期間 / 就業日')}
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td style="${L}">派遣期間</td><td style="${V}">令和　　年　　月　　日から令和　　年　　月　　日まで<br><span style="color:#555;font-size:8.5pt;">（${e(ph.DISPATCH_START)}〜${e(ph.DISPATCH_END)}）</span></td></tr>
+  ${r('就業日', e(ph.WORK_DAYS))}
+</table>
+${sec('就業時間及び休憩時間')}
+<table style="width:100%;border-collapse:collapse;">${r('就業時間・休憩', e(ph.WORK_START)+'から'+e(ph.WORK_END)+'　（休憩 '+e(ph.BREAK_TIME)+'）')}</table>
+${sec('就業日外労働及び就業時間外労働')}
+<table style="width:100%;border-collapse:collapse;">${r('内容', e(ph.OVERTIME_RULE)||'上記就業日以外の就労は月2日まで、上記就業時間外の労働の限度は１日5時間　月36時間　年360時間まで')}</table>
+${sec('製造業務専門派遣先責任者 / 派遣元責任者')}
+<table style="width:100%;border-collapse:collapse;">
+  ${r('派遣先責任者（部署・役職・氏名・電話）','（部署）'+e(ph.CLIENT_MGR_DEPT)+'　（役職）'+e(ph.CLIENT_MGR_TITLE)+'　（氏名）'+e(ph.CLIENT_MGR_NAME)+'　（電話）'+e(ph.CLIENT_MGR_TEL))}
+  ${r('派遣元責任者（部署・役職・氏名・電話）','（部署）'+e(ph.HAKEN_MGR_DEPT)+'　（役職）'+e(ph.HAKEN_MGR_TITLE)+'　（氏名）'+e(ph.HAKEN_MGR_NAME)+'　（電話）'+e(ph.HAKEN_MGR_TEL))}
+</table>
+${sec('就業状況')}
+<table style="width:100%;border-collapse:collapse;">${r('就業状況','別添タイムシートのとおり')}</table>
+${sec('社会保険・雇用保険の被保険者資格取得届の提出の有無')}
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td style="${L}">健康保険</td><td style="${V}">有 ・ 無　　無の理由：</td>
+      <td style="${L}">厚生年金保険</td><td style="${V}">有 ・ 無　　無の理由：</td></tr>
+  <tr><td style="${L}">雇用保険</td><td style="${V}">有 ・ 無　　無の理由：${e(ph.KOYO_HOKEN_NO)?'　被保険者番号：'+e(ph.KOYO_HOKEN_NO):''}</td><td style="${L}"></td><td style="${V}"></td></tr>
+</table>
+${sec('派遣労働者からの苦情処理状況')}
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td style="${L}">申出を受けた日</td><td style="${V}">　　　年　　月　　日</td><td style="${L}">苦情内容・処理状況</td><td style="${V}">　</td></tr>
+</table>
+${sec('段階的かつ体系的な教育訓練を行った日時及び内容')}
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td style="${L}">実施日時</td><td style="${V}">　</td><td style="${L}">教育訓練内容</td><td style="${V}">　</td></tr>
+</table>
+${sec('雇用安定措置の内容')}
+<table style="width:100%;border-collapse:collapse;">
+  ${r('①派遣先への直接雇用の依頼','依頼日時・方法：<br>派遣先の回答日時・内容：')}
+  ${r('②他の派遣先の紹介','')}
+  ${r('③期間を定めない雇用の機会の確保','')}
+</table>
+<div style="font-size:8.5pt;color:#555;margin-top:2mm;">※本台帳は労働者派遣終了後３年間保存すること（派遣法第37条）</div>`;
 }
 
 function buildKoyoJokenHtml(ph){
+  const S='border:1px solid #666;padding:3px 6px;font-size:9pt;line-height:1.7;vertical-align:top;';
+  const L=S+'background:#f0f0f0;font-weight:bold;white-space:nowrap;width:34%;';
+  const V=S+'width:66%;';
+  const r=(l,v)=>`<tr><td style="${L}">${l}</td><td style="${V}">${v||'　'}</td></tr>`;
+  const sec=(t)=>`<div style="background:#e0e0e0;border:1px solid #666;border-bottom:none;padding:2px 6px;font-size:9pt;font-weight:bold;margin-top:2mm;">■ ${t}</div>`;
   return `
-    <div class="meta">締結日：${e(ph.CONTRACT_DATE)}　契約No.${e(ph.CONTRACT_NO)}</div>
-    <h1>雇用契約書　兼　就業条件明示書</h1>
-    <p style="text-align:center;margin-bottom:4mm;font-size:9.5pt;">（労働基準法第15条・労働者派遣法第34条・第31条の2　労使協定方式）</p>
-    <p style="margin-bottom:6mm;font-size:10pt;">
-      ${e(ph.COMPANY_NAME)}（以下「会社」という）と${e(ph.EMPLOYEE_NAME)}（以下「派遣労働者」という）は、以下のとおり雇用契約を締結するとともに就業条件を明示する。
-    </p>
-    <h2>第１部　雇用条件（労働基準法第15条）</h2>
-    <table>
-      ${row('氏名', ph.EMPLOYEE_NAME)}
-      ${row('生年月日', ph.BIRTH_DATE)}
-      ${row('住所', ph.EMPLOYEE_ADDRESS)}
-      ${row('雇用形態', '有期雇用（派遣）')}
-      ${row('契約期間', ph.CONTRACT_START+'　〜　'+ph.CONTRACT_END)}
-      ${row('就業場所（変更の範囲）', '会社の定める事業所')}
-      ${row('業務内容（変更の範囲）', '会社の定める業務全般')}
-      ${row('賃金', (ph.HOURLY_WAGE?'時給 '+ph.HOURLY_WAGE+'円':'')+(ph.MONTHLY_WAGE?'　月給 '+ph.MONTHLY_WAGE+'円':''))}
-      ${row('賃金締切・支払日', '毎月'+ph.PAY_CUTOFF+'日締　翌月'+ph.PAY_DATE+'日払')}
-      ${row('退職・解雇', '自己都合退職は'+ph.NOTICE_DAYS+'日前申出　解雇：労基法の定めによる')}
-      ${row('社会保険・労働保険', '健康保険・厚生年金保険・雇用保険・労災保険')}
-      ${row('無期転換申込権', '通算5年超で無期転換申込可（労契法18条）')}
-      ${row('協定対象の別', '協定対象（有効期間終期：'+ph.AGREEMENT_END_DATE+'）')}
-    </table>
-    <h2>第２部　就業条件明示（労働者派遣法第34条）</h2>
-    <table>
-      ${row('派遣先', ph.CLIENT_NAME)}
-      ${row('派遣先事業所', ph.CLIENT_SITE_NAME+'　'+ph.CLIENT_SITE_ADDRESS)}
-      ${row('就業場所', ph.WORK_LOCATION_DETAIL)}
-      ${row('業務内容', ph.JOB_DETAIL)}
-      ${row('責任の程度', ph.AUTHORITY_DETAIL)}
-      ${row('組織単位', ph.ORGANIZATION_UNIT+'（'+ph.UNIT_MANAGER_TITLE+'）')}
-      ${row('派遣期間', ph.DISPATCH_START+'　〜　'+ph.DISPATCH_END)}
-      ${row('就業日', ph.WORK_DAYS)}
-      ${row('就業時間・休憩', ph.WORK_START+'〜'+ph.WORK_END+'（休憩：'+ph.BREAK_TIME+'）')}
-      ${row('時間外・休日労働', ph.OVERTIME_RULE+'（36協定の範囲内）')}
-      ${row('事業所単位抵触日', ph.JISSAI_SHOKUCHOKU_DATE)}
-      ${row('組織単位抵触日', ph.SOSHIKI_SHOKUCHOKU_DATE)}
-      ${row('派遣料金', ph.HAKEN_RYOKIN+'円（税別・'+ph.RYOKIN_TANI+'あたり）')}
-      <tr><th>指揮命令者</th><td>（部署）${e(ph.CMD_DEPT)}　（役職）${e(ph.CMD_TITLE)}　（氏名）${e(ph.CMD_NAME)}　（電話）${e(ph.CMD_TEL)}</td></tr>
-      <tr><th>派遣先責任者</th><td>（部署）${e(ph.CLIENT_MGR_DEPT)}　（役職）${e(ph.CLIENT_MGR_TITLE)}　（氏名）${e(ph.CLIENT_MGR_NAME)}　（電話）${e(ph.CLIENT_MGR_TEL)}</td></tr>
-      <tr><th>派遣元責任者</th><td>（部署）${e(ph.HAKEN_MGR_DEPT)}　（役職）${e(ph.HAKEN_MGR_TITLE)}　（氏名）${e(ph.HAKEN_MGR_NAME)}　（電話）${e(ph.HAKEN_MGR_TEL)}</td></tr>
-      <tr><th>苦情申出先（派遣先）</th><td>（部署）${e(ph.COMPLAINT_CLIENT_DEPT)}　（氏名）${e(ph.COMPLAINT_CLIENT_NAME)}　（電話）${e(ph.COMPLAINT_CLIENT_TEL)}</td></tr>
-      <tr><th>苦情申出先（派遣元）</th><td>（部署）${e(ph.COMPLAINT_HAKEN_DEPT)}　（氏名）${e(ph.COMPLAINT_HAKEN_NAME)}　（電話）${e(ph.COMPLAINT_HAKEN_TEL)}</td></tr>
-      ${row('安全及び衛生', ph.SAFETY_CONTENT)}
-      ${row('福祉増進の便宜供与', ph.WELFARE_CONTENT)}
-    </table>
-    <p style="margin-top:6mm;font-size:9.5pt;">本書に定めのない事項は労働基準法・労働者派遣法その他関係法令による。</p>
-    <div class="sign-area">
-      <div class="sign-box"><div class="sign-label">派遣元（会社）署名</div>
-        所在地：${e(ph.COMPANY_ADDRESS)}<br>
-        会社名：${e(ph.COMPANY_NAME)}<br>
-        代表者：${e(ph.COMPANY_CEO)}　許可番号：${e(ph.LICENSE_NO)}<br>
-        <div class="sign-line"></div>署名　　　　　　　　　　　<span class="stamp">㊞</span>
-      </div>
-      <div class="sign-box"><div class="sign-label">派遣労働者署名</div>
-        住所：${e(ph.EMPLOYEE_ADDRESS)}<br>
-        氏名：${e(ph.EMPLOYEE_NAME)}<br>
-        <div class="sign-line"></div>署名　　　　　　　　　　　<span class="stamp">㊞</span>
-      </div>
-    </div>`;
+<style>body{font-family:'MS Mincho','Yu Mincho',serif;font-size:9pt;line-height:1.7;color:#000;padding:8mm 12mm;}
+h1{font-size:13pt;font-weight:bold;text-align:center;letter-spacing:4px;margin:0 0 1mm;}
+@media print{body{padding:5mm 10mm;}@page{size:A4;margin:0;}}</style>
+<div style="text-align:right;font-size:8.5pt;margin-bottom:1mm;">契約No.${e(ph.CONTRACT_NO)}　　${e(ph.CONTRACT_DATE)}</div>
+<h1>雇 用 契 約 書　兼　就 業 条 件 明 示 書</h1>
+<p style="text-align:center;font-size:8.5pt;margin-bottom:2mm;">（労働基準法第15条・労働者派遣法第34条　労使協定方式）</p>
+<p style="font-size:9pt;margin-bottom:2mm;">
+  ${e(ph.COMPANY_NAME)}（以下「会社」という）と下記派遣労働者は雇用契約を締結するとともに就業条件を明示する。
+</p>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:3mm;margin-bottom:3mm;">
+  <div style="border:1px solid #666;padding:3px 6px;font-size:9pt;">
+    <div style="font-weight:bold;border-bottom:1px solid #999;margin-bottom:2px;">派遣元事業主</div>
+    所在地：${e(ph.COMPANY_ADDRESS)}<br>
+    事業所名：${e(ph.COMPANY_NAME)}<br>
+    代表者：${e(ph.COMPANY_CEO)}　許可番号：${e(ph.LICENSE_NO)}
+  </div>
+  <div style="border:1px solid #666;padding:3px 6px;font-size:9pt;">
+    <div style="font-weight:bold;border-bottom:1px solid #999;margin-bottom:2px;">派遣労働者</div>
+    氏名：${e(ph.EMPLOYEE_NAME)}<br>
+    生年月日：${e(ph.BIRTH_DATE)}<br>
+    住所：${e(ph.EMPLOYEE_ADDRESS)}
+  </div>
+</div>
+
+${sec('【雇用条件（労働基準法第15条）】')}
+<table style="width:100%;border-collapse:collapse;">
+  ${r('雇用期間', e(ph.CONTRACT_START)+'　〜　'+e(ph.CONTRACT_END))}
+  ${r('就業場所（変更の範囲）', '会社の定める事業所')}
+  ${r('業務内容（変更の範囲）', '会社の定める業務全般')}
+  ${r('始業・終業時刻', (ph.WORK_START&&ph.WORK_END?e(ph.WORK_START)+'　〜　'+e(ph.WORK_END):'現場指定時間による'))}
+  ${r('休憩時間', e(ph.BREAK_TIME)||'60分')}
+  ${r('就業日外・時間外労働', e(ph.OVERTIME_RULE)||'上記就業日以外の就労は月2日まで、就業時間外は１日5時間・月36時間・年360時間まで')}
+  ${r('休日', e(ph.HOLIDAY)||'土日祝日')}
+  <tr><td style="${L}">賃金</td><td style="${V}">
+    ${ph.HOURLY_WAGE?'時給　'+e(ph.HOURLY_WAGE)+'円':''}${ph.MONTHLY_WAGE?'　月給　'+e(ph.MONTHLY_WAGE)+'円':''}<br>
+    <span style="font-size:8.5pt;">時間外割増：25%以上　／　深夜割増（22時〜翌5時）：25%以上　／　休日割増：35%以上</span>
+  </td></tr>
+  ${r('賃金締切・支払日', '毎月'+e(ph.PAY_CUTOFF)+'日締　翌月'+e(ph.PAY_DATE)+'日払')}
+  ${r('退職・解雇', '自己都合退職は'+e(ph.NOTICE_DAYS)+'日前申出　解雇：労基法の定めによる')}
+  ${r('社会保険・労働保険', '健康保険・厚生年金保険・雇用保険・労災保険')}
+  ${r('無期転換申込権', '通算5年超で無期転換申込可（労契法18条）')}
+</table>
+
+${sec('【就業条件明示（労働者派遣法第34条）】')}
+<table style="width:100%;border-collapse:collapse;">
+  ${r('派遣先事業所', e(ph.CLIENT_SITE_NAME)+'　'+e(ph.CLIENT_SITE_ADDRESS))}
+  ${r('就業場所', e(ph.WORK_LOCATION_DETAIL)||e(ph.CLIENT_SITE_NAME))}
+  ${r('業務内容（組織単位）', e(ph.JOB_DETAIL)+'　組織単位：'+e(ph.ORGANIZATION_UNIT)+'（'+e(ph.UNIT_MANAGER_TITLE)+'）')}
+  ${r('業務に伴う責任の程度', e(ph.AUTHORITY_DETAIL)||'□ 付与される権限なし　□ 付与される権限あり：')}
+  <tr><td style="${L}">指揮命令者</td><td style="${V}">（部署）${e(ph.CMD_DEPT)}　（役職）${e(ph.CMD_TITLE)}　（氏名）${e(ph.CMD_NAME)}　（電話）${e(ph.CMD_TEL)}</td></tr>
+  <tr><td style="${L}">派遣期間</td><td style="${V}">令和　　年　　月　　日から令和　　年　　月　　日<br><span style="font-size:8.5pt;color:#555;">（${e(ph.DISPATCH_START)}〜${e(ph.DISPATCH_END)}）</span></td></tr>
+  ${r('就業日', e(ph.WORK_DAYS))}
+  ${r('事業所単位抵触日', e(ph.JISSAI_SHOKUCHOKU_DATE)||'　　　年　　月　　日')}
+  ${r('組織単位抵触日', e(ph.SOSHIKI_SHOKUCHOKU_DATE)||'　　　年　　月　　日')}
+  ${r('派遣料金', ph.HAKEN_RYOKIN?e(ph.HAKEN_RYOKIN)+'円（税別・'+e(ph.RYOKIN_TANI)+'あたり）日額：円':'日額　　　　　円')}
+  <tr><td style="${L}">製造業務専門派遣先責任者</td><td style="${V}">（部署）${e(ph.CLIENT_MGR_DEPT)}　（役職）${e(ph.CLIENT_MGR_TITLE)}　（氏名）${e(ph.CLIENT_MGR_NAME)}　（電話）${e(ph.CLIENT_MGR_TEL)}</td></tr>
+  <tr><td style="${L}">製造業務専門派遣元責任者</td><td style="${V}">（部署）${e(ph.HAKEN_MGR_DEPT)}　（役職）${e(ph.HAKEN_MGR_TITLE)}　（氏名）${e(ph.HAKEN_MGR_NAME)}　（電話）${e(ph.HAKEN_MGR_TEL)}</td></tr>
+  ${r('安全及び衛生', e(ph.SAFETY_CONTENT))}
+  ${r('福祉増進のための便宜供与', e(ph.WELFARE_CONTENT))}
+  <tr><td style="${L}">苦情申出先（派遣先）</td><td style="${V}">（部署）${e(ph.COMPLAINT_CLIENT_DEPT)}　（役職）${e(ph.COMPLAINT_CLIENT_TITLE)}　（氏名）${e(ph.COMPLAINT_CLIENT_NAME)}　（電話）${e(ph.COMPLAINT_CLIENT_TEL)}</td></tr>
+  <tr><td style="${L}">苦情申出先（派遣元）</td><td style="${V}">（部署）${e(ph.COMPLAINT_HAKEN_DEPT)}　（役職）${e(ph.COMPLAINT_HAKEN_TITLE)}　（氏名）${e(ph.COMPLAINT_HAKEN_NAME)}　（電話）${e(ph.COMPLAINT_HAKEN_TEL)}</td></tr>
+</table>
+
+${sec('【協定対象派遣労働者であるか否か / 社会保険の状況】')}
+<table style="width:100%;border-collapse:collapse;">
+  ${r('協定対象の別', '☑ 協定対象派遣労働者（当該協定の有効期間の終了日：'+(e(ph.AGREEMENT_END_DATE)||'　　年　　月　　日')+'）')}
+  <tr><td style="${L}">社会保険・雇用保険</td><td style="${V}">
+    健康保険：有・無　理由：<br>
+    厚生年金保険：有・無　理由：<br>
+    雇用保険：有・無　理由：
+  </td></tr>
+</table>
+
+${sec('【解雇予告・雇用維持措置】')}
+<div style="border:1px solid #666;padding:3px 8px;font-size:8.5pt;line-height:1.8;">
+  派遣元事業主は、労働者派遣契約の解除が行われた場合、新たな就業機会の確保を図ることとする。確保できない場合は休業等を行い雇用の維持を図るとともに、
+  休業手当の支払等労働基準法等に基づく責任を果たすこととする。やむを得ず解雇する場合は少なくとも30日前に予告し、30日前に予告しないときは解雇予告手当を支払うこととする。
+</div>
+
+<p style="font-size:8.5pt;margin-top:2mm;">本書に定めのない事項は労働基準法・労働者派遣法その他関係法令による。</p>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-top:3mm;">
+  <div style="border:1px solid #666;padding:4px 8px;min-height:18mm;font-size:9pt;">
+    <div style="font-weight:bold;border-bottom:1px solid #999;margin-bottom:2px;">派遣元（会社）</div>
+    ${e(ph.COMPANY_NAME)}<br>
+    代表者：${e(ph.COMPANY_CEO)}　許可番号：${e(ph.LICENSE_NO)}<br>
+    <div style="margin-top:8mm;border-bottom:1px solid #333;width:80%;"></div>
+    <span style="font-size:8.5pt;">（役職）　　　　　（氏名）　　　　　　　　　　　　印</span>
+  </div>
+  <div style="border:1px solid #666;padding:4px 8px;min-height:18mm;font-size:9pt;">
+    <div style="font-weight:bold;border-bottom:1px solid #999;margin-bottom:2px;">派遣労働者</div>
+    氏名：${e(ph.EMPLOYEE_NAME)}<br>
+    住所：${e(ph.EMPLOYEE_ADDRESS)}<br>
+    <div style="margin-top:8mm;border-bottom:1px solid #333;width:80%;"></div>
+    <span style="font-size:8.5pt;">署名　　　　　　　　　　　　　　　　　　　印</span>
+  </div>
+</div>`;
+}
+
+function buildHakensekiChichoHtml(ph){
+  const S='border:1px solid #666;padding:3px 6px;font-size:9pt;line-height:1.7;vertical-align:top;';
+  const L=S+'background:#f0f0f0;font-weight:bold;white-space:nowrap;width:34%;';
+  const V=S+'width:66%;';
+  const r=(l,v)=>`<tr><td style="${L}">${l}</td><td style="${V}">${v||'　'}</td></tr>`;
+  const sec=(t)=>`<div style="background:#e0e0e0;border:1px solid #666;border-bottom:none;padding:2px 6px;font-size:9pt;font-weight:bold;margin-top:2mm;">■ ${t}</div>`;
+  return `
+<style>body{font-family:'MS Mincho','Yu Mincho',serif;font-size:9pt;line-height:1.7;color:#000;padding:8mm 12mm;}
+h1{font-size:13pt;font-weight:bold;text-align:center;letter-spacing:4px;margin:0 0 2mm;}
+@media print{body{padding:5mm 10mm;}@page{size:A4;margin:0;}}</style>
+<div style="text-align:right;font-size:8.5pt;margin-bottom:1mm;">${e(ph.CONTRACT_DATE)}</div>
+<div style="font-size:9pt;margin-bottom:2mm;">${e(ph.CLIENT_NAME)}　御中</div>
+<div style="text-align:right;font-size:9pt;margin-bottom:3mm;">
+  所在地：${e(ph.COMPANY_ADDRESS)}<br>
+  事業所名：${e(ph.COMPANY_NAME)}<br>
+  代表者：${e(ph.COMPANY_CEO)}<br>
+  許可番号：${e(ph.LICENSE_NO)}
+</div>
+<h1>派 遣 先 通 知 書</h1>
+<p style="font-size:9pt;margin-bottom:3mm;">
+  令和　　年　　月　　日に締結した労働者派遣契約（契約No.${e(ph.CONTRACT_NO)}）に基づき次の者を派遣します。
+</p>
+
+${sec('派遣労働者の氏名・性別・年齢')}
+<table style="width:100%;border-collapse:collapse;">
+  <tr>
+    <td style="${L}">氏名</td><td style="${V}">${e(ph.EMPLOYEE_NAME)}</td>
+    <td style="${L}">性別</td><td style="${V}">　</td>
+  </tr>
+  <tr>
+    <td style="${L}">年齢</td>
+    <td style="${V}" colspan="3">□ 60歳以上　　☑ 60歳未満（　45歳以上60歳未満　□18歳未満（　　　歳））</td>
+  </tr>
+</table>
+
+${sec('待遇決定方式')}
+<table style="width:100%;border-collapse:collapse;">${r('','☑ 協定対象派遣労働者（労使協定方式）　　□ 協定対象派遣労働者ではない（派遣先均等・均衡方式）')}</table>
+
+${sec('雇用期間')}
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td style="${L}">雇用期間</td><td style="${V}">□ 無期雇用　　☑ 有期雇用（${e(ph.CONTRACT_START)}〜${e(ph.CONTRACT_END)}）</td></tr>
+</table>
+
+${sec('労働・社会保険の被保険者資格取得届の提出の有無及び確認資料')}
+<table style="width:100%;border-collapse:collapse;">
+  <tr><td style="${L}">健康保険</td><td style="${V}">有・無　　無の場合の具体的な理由：</td></tr>
+  <tr><td style="${L}">厚生年金保険</td><td style="${V}">有・無　　無の場合の具体的な理由：</td></tr>
+  <tr><td style="${L}">雇用保険</td><td style="${V}">有・無　　無の場合の具体的な理由：</td></tr>
+  <tr><td style="${L}">確認書類</td><td style="${V}">別添の被保険者証の写しのとおり</td></tr>
+</table>
+
+${sec('労働者派遣契約の就業条件の内容と異なる場合の就業条件の内容（変更がある場合のみ記載）')}
+<table style="width:100%;border-collapse:collapse;">
+  ${r('派遣期間','')}
+  ${r('就業日','')}
+  ${r('就業時間','')}
+  ${r('休憩時間','')}
+  ${r('就業日外労働・就業時間外労働','')}
+  <tr><td style="${L}">派遣元責任者</td><td style="${V}">（部署）${e(ph.HAKEN_MGR_DEPT)}　（役職）${e(ph.HAKEN_MGR_TITLE)}　（氏名）${e(ph.HAKEN_MGR_NAME)}　（電話）${e(ph.HAKEN_MGR_TEL)}</td></tr>
+  <tr><td style="${L}">派遣先責任者</td><td style="${V}">（部署）${e(ph.CLIENT_MGR_DEPT)}　（役職）${e(ph.CLIENT_MGR_TITLE)}　（氏名）${e(ph.CLIENT_MGR_NAME)}　（電話）${e(ph.CLIENT_MGR_TEL)}</td></tr>
+  ${r('便宜供与に関する事項', e(ph.WELFARE_CONTENT))}
+</table>
+<p style="font-size:8.5pt;margin-top:2mm;">（注）通知した内容に変更があった場合には、遅滞なく再度通知すること。</p>`;
 }
 
 // ===== 書類生成（PDF） =====
 const DOC_BUILDERS = {
-  kobetsu: { title:'労働者派遣個別契約書', fn: buildKobetsuHtml },
-  sakicho: { title:'派遣先管理台帳',       fn: buildSakichoHtml },
-  motocho: { title:'派遣元管理台帳',       fn: buildMotochoHtml },
-  koyo_joken: { title:'雇用契約書兼就業条件明示書', fn: buildKoyoJokenHtml },
+  kobetsu:      { title:'労働者派遣個別契約書',       fn: buildKobetsuHtml },
+  sakicho:      { title:'派遣先管理台帳',             fn: buildSakichoHtml },
+  motocho:      { title:'派遣元管理台帳',             fn: buildMotochoHtml },
+  koyo_joken:   { title:'雇用契約書兼就業条件明示書', fn: buildKoyoJokenHtml },
+  chicho:       { title:'派遣先通知書',               fn: buildHakensekiChichoHtml },
 };
 
 async function genDoc(type){
@@ -1649,7 +1914,7 @@ async function genAllDocs(){
     for(const ce of(c.contract_employees||[])){
       const emp=(c._empData||{})[ce.employee_id];
       const ph=buildPlaceholders(c,emp,settings);
-      for(const type of['sakicho','motocho','koyo_joken']){
+      for(const type of['motocho','koyo_joken','chicho']){
         openPdfWindow(DOC_BUILDERS[type].title, DOC_BUILDERS[type].fn(ph), '');
       }
     }
