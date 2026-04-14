@@ -1309,6 +1309,8 @@ function buildPlaceholders(c, emp, settings){
   const site=c.sites||{};const client=site.clients||{};
   const wp=(site.work_patterns||[])[0]||{};
   const today=new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'});
+  // 有期スタッフが1人でもいるか判定
+  const hasKiki=(c.contract_employees||[]).some(e=>e.employment_type!=='permanent');
   return{
     CONTRACT_NO: v(c.contract_no),
     CONTRACT_DATE: today,
@@ -1326,8 +1328,9 @@ function buildPlaceholders(c, emp, settings){
     STAFF_COUNT: String((c.contract_employees||[]).filter(e=>e.is_active).length),
     HAKEN_RYOKIN: v(c.haken_ryokin),
     RYOKIN_TANI: v(c.ryokin_tani),
-    JISSAI_SHOKUCHOKU_DATE: v(c.jissai_shokuchoku_date),
-    SOSHIKI_SHOKUCHOKU_DATE: v(c.soshiki_shokuchoku_date),
+    JISSAI_SHOKUCHOKU_DATE: hasKiki ? v(c.jissai_shokuchoku_date) : null,
+    SOSHIKI_SHOKUCHOKU_DATE: hasKiki ? v(c.soshiki_shokuchoku_date) : null,
+    HAS_KIKI: hasKiki,
     // 現場
     CLIENT_SITE_NAME: v(site.name),
     CLIENT_SITE_ADDRESS: v(site.address),
@@ -1816,8 +1819,8 @@ ${sec('【就業条件明示（労働者派遣法第34条）】')}
   <tr><td style="${L}">指揮命令者</td><td style="${V}">（部署）${e(ph.CMD_DEPT)}　（役職）${e(ph.CMD_TITLE)}　（氏名）${e(ph.CMD_NAME)}　（電話）${e(ph.CMD_TEL)}</td></tr>
   <tr><td style="${L}">派遣期間</td><td style="${V}">${e(ph.DISPATCH_START)}　〜　${e(ph.DISPATCH_END)}</td></tr>
   <tr><td style="${L}">就業日</td><td style="${V};white-space:nowrap;">${e(ph.WORK_DAYS)}</td></tr>
-  ${r('事業所単位抵触日', e(ph.JISSAI_SHOKUCHOKU_DATE)||'　　　年　　月　　日')}
-  ${r('組織単位抵触日', e(ph.SOSHIKI_SHOKUCHOKU_DATE)||'　　　年　　月　　日')}
+  ${ph.HAS_KIKI ? r('事業所単位抵触日', e(ph.JISSAI_SHOKUCHOKU_DATE)||'　　　年　　月　　日') : ''}
+  ${ph.HAS_KIKI ? r('組織単位抵触日', e(ph.SOSHIKI_SHOKUCHOKU_DATE)||'　　　年　　月　　日') : ''}
   ${r('派遣料金', ph.HAKEN_RYOKIN?e(ph.HAKEN_RYOKIN)+'円（税別・'+e(ph.RYOKIN_TANI)+'あたり）日額：円':'日額　　　　　円')}
   <tr><td style="${L}">製造業務専門派遣先責任者</td><td style="${V}">（部署）${e(ph.CLIENT_MGR_DEPT)}　（役職）${e(ph.CLIENT_MGR_TITLE)}　（氏名）${e(ph.CLIENT_MGR_NAME)}　（電話）${e(ph.CLIENT_MGR_TEL)}</td></tr>
   <tr><td style="${L}">製造業務専門派遣元責任者</td><td style="${V}">（部署）${e(ph.HAKEN_MGR_DEPT)}　（役職）${e(ph.HAKEN_MGR_TITLE)}　（氏名）${e(ph.HAKEN_MGR_NAME)}　（電話）${e(ph.HAKEN_MGR_TEL)}</td></tr>
