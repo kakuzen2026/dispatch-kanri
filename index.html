@@ -1616,28 +1616,33 @@ ${section('労働者派遣契約の解除に当たって講ずる派遣労働者
 ${section('苦情の申出先、処理方法・連携体制')}
 <div style="border:1px solid #666;padding:4px 8px;font-size:9pt;">
   <div style="font-weight:bold;margin-bottom:3px;">（1）苦情の申出を受ける者</div>
-  <table style="width:100%;border-collapse:collapse;margin-bottom:4px;">
+  <table style="width:100%;border-collapse:collapse;margin-bottom:4px;table-layout:fixed;">
+    <colgroup>
+      <col style="width:7%"><col style="width:7%"><col style="width:16%">
+      <col style="width:7%"><col style="width:14%"><col style="width:7%"><col style="width:14%">
+      <col style="width:7%"><col style="width:21%">
+    </colgroup>
     <tr>
-      <td style="border:1px solid #999;padding:2px 6px;background:#f5f5f5;font-weight:bold;white-space:nowrap;">派遣先</td>
-      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（部署）</td>
-      <td style="border:1px solid #999;padding:2px 6px;min-width:80px;">${e(ph.COMPLAINT_CLIENT_DEPT)}</td>
-      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（役職）</td>
-      <td style="border:1px solid #999;padding:2px 6px;min-width:80px;">${e(ph.COMPLAINT_CLIENT_TITLE)}</td>
-      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（氏名）</td>
-      <td style="border:1px solid #999;padding:2px 6px;min-width:80px;">${e(ph.COMPLAINT_CLIENT_NAME)}</td>
-      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（電話）</td>
-      <td style="border:1px solid #999;padding:2px 6px;min-width:100px;">${e(ph.COMPLAINT_CLIENT_TEL)}</td>
+      <td style="padding:2px 4px;font-weight:bold;white-space:nowrap;">派遣先</td>
+      <td style="padding:2px 4px;white-space:nowrap;color:#555;">（部署）</td>
+      <td style="padding:2px 4px;">${e(ph.COMPLAINT_CLIENT_DEPT)}</td>
+      <td style="padding:2px 4px;white-space:nowrap;color:#555;">（役職）</td>
+      <td style="padding:2px 4px;">${e(ph.COMPLAINT_CLIENT_TITLE)}</td>
+      <td style="padding:2px 4px;white-space:nowrap;color:#555;">（氏名）</td>
+      <td style="padding:2px 4px;">${e(ph.COMPLAINT_CLIENT_NAME)}</td>
+      <td style="padding:2px 4px;white-space:nowrap;color:#555;">（電話）</td>
+      <td style="padding:2px 4px;">${e(ph.COMPLAINT_CLIENT_TEL)}</td>
     </tr>
     <tr>
-      <td style="border:1px solid #999;padding:2px 6px;background:#f5f5f5;font-weight:bold;white-space:nowrap;">派遣元</td>
-      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（部署）</td>
-      <td style="border:1px solid #999;padding:2px 6px;">${e(ph.COMPLAINT_HAKEN_DEPT)}</td>
-      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（役職）</td>
-      <td style="border:1px solid #999;padding:2px 6px;">${e(ph.COMPLAINT_HAKEN_TITLE)}</td>
-      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（氏名）</td>
-      <td style="border:1px solid #999;padding:2px 6px;">${e(ph.COMPLAINT_HAKEN_NAME)}</td>
-      <td style="border:1px solid #999;padding:2px 6px;white-space:nowrap;">（電話）</td>
-      <td style="border:1px solid #999;padding:2px 6px;">${e(ph.COMPLAINT_HAKEN_TEL)}</td>
+      <td style="padding:2px 4px;font-weight:bold;white-space:nowrap;">派遣元</td>
+      <td style="padding:2px 4px;white-space:nowrap;color:#555;">（部署）</td>
+      <td style="padding:2px 4px;">${e(ph.COMPLAINT_HAKEN_DEPT)}</td>
+      <td style="padding:2px 4px;white-space:nowrap;color:#555;">（役職）</td>
+      <td style="padding:2px 4px;">${e(ph.COMPLAINT_HAKEN_TITLE)}</td>
+      <td style="padding:2px 4px;white-space:nowrap;color:#555;">（氏名）</td>
+      <td style="padding:2px 4px;">${e(ph.COMPLAINT_HAKEN_NAME)}</td>
+      <td style="padding:2px 4px;white-space:nowrap;color:#555;">（電話）</td>
+      <td style="padding:2px 4px;">${e(ph.COMPLAINT_HAKEN_TEL)}</td>
     </tr>
   </table>
   <div style="font-weight:bold;margin-bottom:3px;">（2）苦情処理方法、連携体制等</div>
@@ -1654,17 +1659,13 @@ ${section('苦情の申出先、処理方法・連携体制')}
     （所在地）${e(ph.CLIENT_ADDRESS)}<br>
     （事業所名）${e(ph.CLIENT_NAME)}<br>
     （代表者名）${e(ph.CLIENT_CEO)}<br>
-    <div style="margin-top:6mm;border-bottom:1px solid #333;width:80%;"></div>
-    <span style="font-size:9pt;">（役職）　　　　　　　（氏名）　　　　　　　　　　　　　　　　　印</span>
   </div>
   <div class="sign-box">
     <div class="sign-label">派　遣　元</div>
     （所在地）${e(ph.COMPANY_ADDRESS)}<br>
     （事業所名）${e(ph.COMPANY_NAME)}<br>
-    （代表者名）${e(ph.COMPANY_CEO)}<br>
+    （代表者名）${e(ph.COMPANY_CEO_TITLE)}&nbsp;&nbsp;${e(ph.COMPANY_CEO)}<br>
     （許可番号）${e(ph.LICENSE_NO)}<br>
-    <div style="margin-top:6mm;border-bottom:1px solid #333;width:80%;"></div>
-    <span style="font-size:9pt;">${e(ph.COMPANY_CEO_TITLE)||'（役職）　　　　　'}&nbsp;&nbsp;${e(ph.COMPANY_CEO)||'（氏名）　　　　　　'}&nbsp;&nbsp;印</span>
   </div>
 </div>`;
 }
