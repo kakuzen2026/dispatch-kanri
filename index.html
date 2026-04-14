@@ -1692,7 +1692,12 @@ function toast(msg,type='success'){
   document.getElementById('toast-container').appendChild(el);
   setTimeout(()=>el.remove(),3500);
 }
-document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
+// モーダル外クリックで閉じる（テキスト選択中は閉じない）
+document.querySelectorAll('.modal-overlay').forEach(o=>{
+  let mousedownOnOverlay=false;
+  o.addEventListener('mousedown',e=>{mousedownOnOverlay=(e.target===o);});
+  o.addEventListener('click',e=>{if(e.target===o&&mousedownOnOverlay)o.classList.remove('open');});
+});
 document.addEventListener('click',e=>{const dd=document.getElementById('ct-emp-dd');const wrap=dd?.closest('.emp-search-wrap');if(wrap&&!wrap.contains(e.target))dd.style.display='none';});
 
 // ===== INIT =====
