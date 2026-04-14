@@ -277,8 +277,8 @@ tr:hover td{background:rgba(255,255,255,.02);}
   </div>
   <div class="nav-section" style="margin-top:auto;">
     <div class="nav-section-label">連携</div>
-    <div class="nav-item" onclick="window.open('jugyoin.html','_blank')" style="color:var(--accent2);border:1px solid var(--border);border-radius:var(--radius);">
-      <span class="icon">👥</span>従業員管理台帳 ↗
+    <div class="nav-item" onclick="navigate('jugyoin')" style="color:var(--accent2);border:1px solid var(--border);border-radius:var(--radius);">
+      <span class="icon">👥</span>従業員管理台帳
     </div>
   </div>
   <div class="sidebar-bottom"><div style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;">v3.1.0</div></div>
@@ -293,7 +293,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <div class="mnav-item" onclick="navigate('contracts')" data-page="contracts"><div class="micon">📄</div><div class="mlabel">契約</div></div>
     <div class="mnav-item" onclick="navigate('billing')" data-page="billing"><div class="micon">💴</div><div class="mlabel">請求</div></div>
     <div class="mnav-item" onclick="navigate('records')" data-page="records"><div class="micon">📋</div><div class="mlabel">記録</div></div>
-    <div class="mnav-item" onclick="window.open('jugyoin.html','_blank')"><div class="micon">👥</div><div class="mlabel">従業員</div></div>
+    <div class="mnav-item" onclick="navigate('jugyoin')" data-page="jugyoin"><div class="micon">👥</div><div class="mlabel">従業員</div></div>
   </div>
 </nav>
 
@@ -355,6 +355,11 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <!-- 記録管理 -->
     <div class="page" id="page-records">
       <div id="mainContent-records"><div class="loading"><div class="spinner"></div>読み込み中...</div></div>
+    </div>
+
+    <!-- 従業員管理（iframe） -->
+    <div class="page" id="page-jugyoin" style="padding:0;height:calc(100vh - 56px);">
+      <iframe id="jugyoin-frame" src="" style="width:100%;height:100%;border:none;display:block;" allow="same-origin"></iframe>
     </div>
 
     <!-- 設定 -->
@@ -767,7 +772,7 @@ function doLogin(){
 function showApp(){loadDashboard();}
 
 // ===== NAV =====
-const NAV_TITLES={dashboard:'ダッシュボード',clients:'取引先管理',sites:'現場管理',contracts:'契約管理',billing:'請求管理',records:'記録管理',settings:'設定'};
+const NAV_TITLES={dashboard:'ダッシュボード',clients:'取引先管理',sites:'現場管理',contracts:'契約管理',billing:'請求管理',records:'記録管理',settings:'設定',jugyoin:'従業員管理台帳'};
 const NAV_BTNS={
   clients:`<button class="btn btn-primary" onclick="openClientModal()">＋ <span class="btn-text">取引先を登録</span></button>`,
   sites:`<button class="btn btn-primary" onclick="openSiteModal()">＋ <span class="btn-text">現場を登録</span></button>`,
@@ -790,6 +795,12 @@ function navigate(page){
   else if(page==='contracts') loadContracts();
   else if(page==='billing'){initBillingMonths();loadBilling();}
   else if(page==='records') loadRecords();
+  else if(page==='jugyoin'){
+    const frame=document.getElementById('jugyoin-frame');
+    if(!frame.src){
+      frame.src='jugyoin.html?autologin=1';
+    }
+  }
   else if(page==='settings') loadSettings();
 }
 
@@ -1116,7 +1127,7 @@ async function openCtDetail(cid){
           <h4>👤 ${esc(enames[e.employee_id]||'（氏名取得中）')}</h4>
           <div style="font-size:12px;color:var(--text3);">雇用形態：<span style="color:var(--text);">${e.employment_type==='permanent'?'無期契約':'有期契約'}</span></div>
           <div style="font-size:11px;color:var(--text3);margin-top:4px;font-family:'DM Mono',monospace;">従業員ID: ${e.employee_id}</div>
-          <button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%;" onclick="window.open('jugyoin.html','_blank')" title="従業員管理台帳で確認">従業員台帳で確認 ↗</button>
+          <button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%;" onclick="navigate('jugyoin')" title="従業員管理台帳で確認">従業員台帳で確認</button>
         </div>`).join('')}
     </div>
     ${c.job_detail?`<div style="margin-top:8px;"><div style="font-size:11px;color:var(--text3);">業務内容</div><div style="font-size:13px;margin-top:4px;">${esc(c.job_detail)}</div></div>`:''}
@@ -1803,14 +1814,17 @@ ${section('限定区分 / 協定対象 / 派遣人員')}
 ${section('業務内容 / 責任の程度 / 組織単位')}
 ${tbl(`
   ${r('業務内容', e(ph.JOB_DETAIL))}
-  ${r2('業務に伴う責任の程度',e(ph.AUTHORITY_DETAIL)||'付与される権限なし','組織単位（長の職名）',e(ph.ORGANIZATION_UNIT)+(ph.UNIT_MANAGER_TITLE?'（'+e(ph.UNIT_MANAGER_TITLE)+'）':''))}
+  ${r('業務に伴う責任の程度', e(ph.AUTHORITY_DETAIL)||'付与される権限なし')}
+  ${r('組織単位（長の職名）', e(ph.ORGANIZATION_UNIT)+(ph.UNIT_MANAGER_TITLE?'（'+e(ph.UNIT_MANAGER_TITLE)+'）':''))}
 `)}
 
 ${section('指揮命令者 / 派遣期間・就業日 / 就業時間')}
 ${tbl(`
   ${r('指揮命令者', '（部署）'+e(ph.CMD_DEPT)+'　（役職）'+e(ph.CMD_TITLE)+'　（氏名）'+e(ph.CMD_NAME)+'　（電話）'+e(ph.CMD_TEL))}
-  ${r2('派遣期間',e(ph.DISPATCH_START)+'　〜　'+e(ph.DISPATCH_END),'就業日',e(ph.WORK_DAYS))}
-  ${r2('就業時間',e(ph.WORK_START)+'から'+e(ph.WORK_END)+'（休憩 '+e(ph.BREAK_TIME)+'）','就業時間外労働',e(ph.OVERTIME_RULE)||'月2日・１日5h・月36h・年360hまで')}
+  ${r('派遣期間', e(ph.DISPATCH_START)+'　〜　'+e(ph.DISPATCH_END))}
+  ${r('就業日', e(ph.WORK_DAYS))}
+  ${r('就業時間', e(ph.WORK_START)+'から'+e(ph.WORK_END)+'（休憩 '+e(ph.BREAK_TIME)+'）')}
+  ${r('就業時間外労働', e(ph.OVERTIME_RULE)||'月2日・１日5時間・月36時間・年360時間まで')}
 `)}
 
 ${section('派遣先責任者 / 派遣元責任者')}
@@ -1827,18 +1841,25 @@ ${tbl(`
 
 ${section('派遣先が派遣労働者を雇用する場合の紛争防止措置')}
 <div style="border:1px solid #666;padding:2px 6px;font-size:8pt;line-height:1.6;">
-派遣先が派遣終了後に当該派遣労働者を雇用する場合、その雇用意思を事前に派遣元へ示すこととする。
+派遣先が派遣終了後に、当該派遣労働者を雇用する場合、その雇用意思を事前に派遣元へ示すこととする。
 </div>
 
-${section('労働者派遣契約の解除に当たって講ずる措置')}
-<div style="border:1px solid #666;padding:2px 6px;font-size:8pt;line-height:1.6;">
-（1）<b>事前申入れ</b>：派遣先の責による解除の場合、相当の猶予期間をもって申入れを行う。　（2）<b>就業機会の確保</b>：関連会社への就業あっせん等により新たな就業機会の確保を図る。　（3）<b>損害賠償</b>：派遣先の責による解除の場合、休業手当相当額以上、また解雇予告手当に相当する額の賠償を行う。派遣先及び派遣元双方の責に帰すべき事由がある場合はその割合についても考慮する。　（4）<b>理由の明示</b>：派遣元から請求があったときは解除の理由を明らかにする。
+${section('労働者派遣契約の解除に当たって講ずる派遣労働者の雇用の安定を図るために必要な措置')}
+<div style="border:1px solid #666;padding:2px 8px;font-size:8pt;line-height:1.7;">
+  <div style="font-weight:bold;margin-bottom:1px;">（1）労働者派遣契約の解除の事前の申入れ</div>
+  <div style="margin-bottom:4px;text-indent:1em;">派遣先は、専ら派遣先に起因する事由により、労働者派遣契約の契約期間が満了する前の解除を行おうとする場合には、派遣元の合意を得ることはもとより、あらかじめ相当の猶予期間をもって派遣元に解除の申入れを行うこととする。</div>
+  <div style="font-weight:bold;margin-bottom:1px;">（2）派遣先における就業機会の確保</div>
+  <div style="margin-bottom:4px;text-indent:1em;">派遣先及び派遣元は、労働者派遣契約の契約期間が満了する前に派遣労働者の責に帰すべき事由によらない労働者派遣契約の解除を行った場合には、派遣先の関連会社での就業をあっせんする等により、当該労働者派遣契約に係る派遣労働者の新たな就業機会の確保を図ることとする。</div>
+  <div style="font-weight:bold;margin-bottom:1px;">（3）損害賠償等に係る適切な措置</div>
+  <div style="margin-bottom:4px;text-indent:1em;">派遣先は、派遣先の責に帰すべき事由により労働者派遣契約の契約期間が満了する前に労働者派遣契約の解除を行おうとする場合には、派遣労働者の新たな就業機会の確保を図ることとし、これができないときには、少なくとも当該労働者派遣契約の解除に伴い派遣元が派遣労働者を休業させること等を余儀なくされたことにより生じた休業手当に相当する額以上の額の賠償を行う。また、派遣先及び派遣元双方の責に帰すべき事由がある場合には、それぞれの責に帰すべき部分の割合についても十分に考慮することとする。</div>
+  <div style="font-weight:bold;margin-bottom:1px;">（4）労働者派遣契約の解除の理由の明示</div>
+  <div style="text-indent:1em;">派遣先は、労働者派遣契約の契約期間が満了する前に労働者派遣契約の解除を行おうとする場合であって、派遣元から請求があったときは、労働者派遣契約の解除を行った理由を派遣元に対して明らかにすることとする。</div>
 </div>
 
 ${section('苦情の申出先、処理方法・連携体制')}
 <div style="border:1px solid #666;padding:2px 6px;font-size:8pt;">
-  <div style="font-weight:bold;margin-bottom:1px;">（1）苦情の申出を受ける者</div>
-  <table style="width:100%;border-collapse:collapse;margin-bottom:2px;table-layout:fixed;">
+  <div style="font-weight:bold;margin-bottom:2px;">（1）苦情の申出を受ける者</div>
+  <table style="width:100%;border-collapse:collapse;margin-bottom:3px;table-layout:fixed;">
     <colgroup><col style="width:7%"><col style="width:7%"><col style="width:16%"><col style="width:7%"><col style="width:14%"><col style="width:7%"><col style="width:14%"><col style="width:7%"><col style="width:21%"></colgroup>
     <tr>
       <td style="padding:1px 3px;font-weight:bold;">派遣先</td>
@@ -1855,8 +1876,12 @@ ${section('苦情の申出先、処理方法・連携体制')}
       <td style="padding:1px 3px;color:#555;">（電話）</td><td style="padding:1px 3px;">${e(ph.COMPLAINT_HAKEN_TEL)}</td>
     </tr>
   </table>
-  <div style="font-weight:bold;margin-bottom:1px;">（2）苦情処理方法、連携体制等</div>
-  <div style="line-height:1.65;">　①派遣先における(1)記載の者が苦情の申出を受けたときは、ただちに派遣先責任者へ連絡し、誠意をもって遅滞なく処理を図り、結果を必ず派遣労働者に通知する。　②派遣元における(1)記載の者が苦情の申出を受けたときは、ただちに派遣元責任者へ連絡し、誠意をもって遅滞なく処理を図り、結果を必ず派遣労働者に通知する。　③派遣先及び派遣元は、自らで即時処理した苦情の他は相互に遅滞なく通知し、密接に連絡調整を行いつつ解決を図る。</div>
+  <div style="font-weight:bold;margin-bottom:2px;">（2）苦情処理方法、連携体制等</div>
+  <div style="line-height:1.7;">
+    　①派遣先における(1)記載の者が苦情の申出を受けたときは、ただちに派遣先責任者へ連絡することとし、当該派遣先責任者が中心となって誠意をもって、遅滞なく、当該苦情の適切かつ迅速な処理を図ることとし、その結果について必ず派遣労働者に通知することとする。<br>
+    　②派遣元における(1)記載の者が苦情の申出を受けたときは、ただちに派遣元責任者へ連絡することとし、当該派遣元責任者が中心となって誠意をもって、遅滞なく、当該苦情の適切かつ迅速な処理を図ることとし、その結果について必ず派遣労働者に通知することとする。<br>
+    　③派遣先及び派遣元は、自らでその解決が容易であり、即時に処理した苦情の他は、相互に遅滞なく通知するとともに、密接に連絡調整を行いつつ、その解決を図ることとする。
+  </div>
 </div>
 
 <div class="sign-grid">
