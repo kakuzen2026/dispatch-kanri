@@ -6,23 +6,135 @@
 <title>派遣管理台帳</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-// docxライブラリを動的に読み込み、確実にグローバルに展開する
-(function(){
-  function loadScript(url, cb){
-    const s=document.createElement('script');
-    s.src=url;s.onload=cb;s.onerror=function(){cb(new Error('load failed:'+url));};
-    document.head.appendChild(s);
+// ===== 軽量docx生成（外部ライブラリ不要・ブラウザ標準APIのみ） =====
+window.MiniDocx = {
+  async generate(title, bodyText, filename) {
+    // docxはZIPファイル。必要な最小限のXMLを組み立てる
+    const lines = bodyText.split('\n');
+    const para = (text, bold, center) => {
+      const rPr = bold ? '<w:rPr><w:b/><w:sz w:val="28"/></w:rPr>' : '<w:rPr><w:sz w:val="20"/></w:rPr>';
+      const pPr = center ? '<w:pPr><w:jc w:val="center"/><w:spacing w:after="400"/></w:pPr>' : '<w:pPr><w:spacing w:after="100"/></w:pPr>';
+      const escaped = String(text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      return `<w:p>${pPr}<w:r>${rPr}<w:t xml:space="preserve">${escaped}</w:t></w:r></w:p>`;
+    };
+    const paras = [para(title, true, true), ...lines.map(l => para(l, false, false))].join('');
+    const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body>${paras}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr></w:body></w:document>`;
+
+    const relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+    const wordRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>`;
+
+    const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`;
+
+    // JSZipなしでZIPを組み立てる（簡易実装）
+    const zip = await MiniDocx._buildZip([
+      { name: '[Content_Types].xml', data: contentTypesXml },
+      { name: '_rels/.rels', data: relsXml },
+      { name: 'word/document.xml', data: docXml },
+      { name: 'word/_rels/document.xml.rels', data: wordRelsXml },
+    ]);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([zip], {type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  },
+
+  // 簡易ZIP構築（非圧縮ストアモード）
+  async _buildZip(files) {
+    const enc = new TextEncoder();
+    const parts = [];
+    const centralDir = [];
+    let offset = 0;
+
+    for (const f of files) {
+      const nameBytes = enc.encode(f.name);
+      const dataBytes = enc.encode(f.data);
+      const crc = MiniDocx._crc32(dataBytes);
+      const size = dataBytes.length;
+
+      // Local file header
+      const lh = new DataView(new ArrayBuffer(30 + nameBytes.length));
+      lh.setUint32(0, 0x04034b50, true); // signature
+      lh.setUint16(4, 20, true);  // version needed
+      lh.setUint16(6, 0, true);   // flags
+      lh.setUint16(8, 0, true);   // compression: store
+      lh.setUint16(10, 0, true);  // mod time
+      lh.setUint16(12, 0, true);  // mod date
+      lh.setUint32(14, crc, true);
+      lh.setUint32(18, size, true);
+      lh.setUint32(22, size, true);
+      lh.setUint16(26, nameBytes.length, true);
+      lh.setUint16(28, 0, true);
+      new Uint8Array(lh.buffer).set(nameBytes, 30);
+
+      // Central directory entry
+      const cd = new DataView(new ArrayBuffer(46 + nameBytes.length));
+      cd.setUint32(0, 0x02014b50, true);
+      cd.setUint16(4, 20, true); cd.setUint16(6, 20, true);
+      cd.setUint16(8, 0, true); cd.setUint16(10, 0, true);
+      cd.setUint16(12, 0, true); cd.setUint16(14, 0, true);
+      cd.setUint32(16, crc, true);
+      cd.setUint32(20, size, true);
+      cd.setUint32(24, size, true);
+      cd.setUint16(28, nameBytes.length, true);
+      cd.setUint16(30, 0, true); cd.setUint16(32, 0, true);
+      cd.setUint16(34, 0, true); cd.setUint16(36, 0, true);
+      cd.setUint32(38, 0, true);
+      cd.setUint32(42, offset, true);
+      new Uint8Array(cd.buffer).set(nameBytes, 46);
+
+      parts.push(new Uint8Array(lh.buffer), dataBytes);
+      centralDir.push(new Uint8Array(cd.buffer));
+      offset += lh.buffer.byteLength + size;
+    }
+
+    const cdBytes = MiniDocx._concat(centralDir);
+    const eocd = new DataView(new ArrayBuffer(22));
+    eocd.setUint32(0, 0x06054b50, true);
+    eocd.setUint16(4, 0, true); eocd.setUint16(6, 0, true);
+    eocd.setUint16(8, files.length, true);
+    eocd.setUint16(10, files.length, true);
+    eocd.setUint32(12, cdBytes.byteLength, true);
+    eocd.setUint32(16, offset, true);
+    eocd.setUint16(20, 0, true);
+
+    return MiniDocx._concat([...parts, cdBytes, new Uint8Array(eocd.buffer)]);
+  },
+
+  _concat(arrays) {
+    const total = arrays.reduce((s, a) => s + a.byteLength, 0);
+    const result = new Uint8Array(total);
+    let pos = 0;
+    for (const a of arrays) { result.set(a, pos); pos += a.byteLength; }
+    return result;
+  },
+
+  _crc32(data) {
+    if (!MiniDocx._crcTable) {
+      MiniDocx._crcTable = new Uint32Array(256);
+      for (let i = 0; i < 256; i++) {
+        let c = i;
+        for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        MiniDocx._crcTable[i] = c;
+      }
+    }
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < data.length; i++) crc = MiniDocx._crcTable[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
   }
-  window._docxReady=false;
-  loadScript('https://unpkg.com/docx@8.5.0/build/index.min.js',function(err){
-    if(!err&&(window.docx||typeof docx!=='undefined')){window._docxReady=true;return;}
-    // フォールバック：jsDelivr
-    loadScript('https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.min.js',function(err2){
-      if(!err2)window._docxReady=true;
-    });
-  });
-  loadScript('https://unpkg.com/file-saver@2.0.5/dist/FileSaver.min.js',function(){});
-})();
+};
 </script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap');
@@ -1380,25 +1492,10 @@ function replacePlaceholders(text, ph){
   return result;
 }
 
-// テンプレートテキストからdocxを生成（シンプルなテキスト版）
+// テンプレートテキストからdocxを生成（外部ライブラリ不要）
 async function createSimpleDocx(title, bodyText, filename){
   try{
-    // docxライブラリのグローバル名を複数パターンで探す
-    const docxLib = window.docx || window.DOCX || window.Docx
-      || (typeof docx!=='undefined'?docx:null)
-      || (typeof DOCX!=='undefined'?DOCX:null);
-    if(!docxLib||!docxLib.Document){
-      throw new Error('docxライブラリが読み込まれていません。ページを再読み込みしてください。');
-    }
-    const {Document,Packer,Paragraph,TextRun,AlignmentType}=docxLib;
-    const lines=bodyText.split('\n');
-    const children=[
-      new Paragraph({children:[new TextRun({text:title,bold:true,size:28})],alignment:AlignmentType.CENTER,spacing:{after:400}}),
-      ...lines.map(line=>new Paragraph({children:[new TextRun({text:line,size:20})],spacing:{after:100}})),
-    ];
-    const doc=new Document({sections:[{properties:{page:{size:{width:11906,height:16838},margin:{top:1134,right:1134,bottom:1134,left:1134}}},children}]});
-    const buf=await Packer.toBuffer(doc);
-    saveAs(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),filename);
+    await MiniDocx.generate(title, bodyText, filename);
   }catch(e){
     console.error('docx生成エラー',e);
     toast('書類生成に失敗しました：'+e.message,'error');
