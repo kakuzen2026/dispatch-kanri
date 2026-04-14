@@ -770,17 +770,19 @@ async function loadClients(){const {data}=await db.from('clients').select('*').o
 function renderClients(list){
   const el=document.getElementById('clients-table');
   if(!list.length){el.innerHTML='<div class="empty-state"><div class="icon">🏢</div><p>取引先が登録されていません</p></div>';return;}
-  el.innerHTML=`<table><thead><tr><th>企業名</th><th>代表者名</th><th>役職</th><th>電話番号</th><th>メール</th><th>操作</th></tr></thead><tbody>
-    ${list.map(c=>`<tr>
+  el.innerHTML=`<table><thead><tr><th>企業名</th><th>担当者</th><th>電話番号</th><th>メール</th><th>操作</th></tr></thead><tbody>
+    ${list.map(c=>{
+      const tantou=[esc(c.ceo||''),esc(c.contact_person||'')].filter(Boolean).join('　');
+      return`<tr>
       <td data-label="企業名"><strong>${esc(c.name)}</strong></td>
-      <td data-label="代表者名">${esc(c.ceo||'—')}</td>
-      <td data-label="役職">${esc(c.contact_person||'—')}</td>
+      <td data-label="担当者">${tantou||'—'}</td>
       <td data-label="電話番号">${esc(c.contact_phone||'—')}</td>
       <td data-label="メール">${esc(c.contact_email||'—')}</td>
       <td class="no-label" style="display:flex;gap:6px;">
         <button class="btn btn-secondary btn-sm" onclick="openClientModalById('${esc(c.id)}')">編集</button>
         <button class="btn btn-danger btn-sm" onclick="deleteClient('${esc(c.id)}')">削除</button>
-      </td></tr>`).join('')}</tbody></table>`;
+      </td></tr>`;
+    }).join('')}</tbody></table>`;
 }
 function filterClients(){const q=document.getElementById('search-clients').value.toLowerCase();renderClients(ST.clients.filter(c=>c.name.toLowerCase().includes(q)));}
 function openClientModalById(id){
