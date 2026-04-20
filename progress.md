@@ -32,9 +32,8 @@ Phase 3: 実装（DB統合作業中）
 - Step 5: 動作確認（コンソールエラーなし・ログイン・各機能）
 
 ## 未解決・注意事項
-- 本リポジトリ（dispatch-kanri）の派遣管理側HTML（hakenn.html等）にも
-  `empDb.from('employees')` / `empDb.from('dispatch_contracts')` の呼び出しあり。
-  Step 4完了後、派遣管理側も同様に `db.from(...)` への置換が必要
+- 本リポジトリ（dispatch-kanri）の派遣管理側HTML（hakenn.html等）の修正は
+  不要（employee-ledgerに統合済みのため）。該当ファイルは archive/ に移動済み
 - `db.from('work_patterns')`（派遣管理側・site_id付き）は変更しない
 - `sb()` 関数はラッパーとして残す（呼び出し箇所が多いため直接置換しない）
 
